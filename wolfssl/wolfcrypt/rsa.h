@@ -1,6 +1,6 @@
 /* rsa.h
  *
- * Copyright (C) 2006-2017 wolfSSL Inc.
+ * Copyright (C) 2006-2019 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -37,6 +37,20 @@
     #define WC_RSA_EXPONENT 65537L
 #endif
 
+#if defined(WC_RSA_NONBLOCK)
+    /* enable support for fast math based non-blocking exptmod */
+    /* this splits the RSA function into many smaller operations */
+    #ifndef USE_FAST_MATH
+        #error RSA non-blocking mode only supported using fast math
+    #endif
+    #ifndef TFM_TIMING_RESISTANT
+      #error RSA non-blocking mode only supported with timing resistance enabled
+    #endif
+
+    /* RSA bounds check is not supported with RSA non-blocking mode */
+    #undef  NO_RSA_BOUNDS_CHECK
+    #define NO_RSA_BOUNDS_CHECK
+#endif
 
 /* allow for user to plug in own crypto */
 #if !defined(HAVE_FIPS) && (defined(HAVE_USER_RSA) || defined(HAVE_FAST_RSA))
@@ -64,6 +78,10 @@
 
 #ifdef WOLFSSL_XILINX_CRYPT
 #include "xsecure_rsa.h"
+#endif
+
+#if defined(WOLFSSL_CRYPTOCELL)
+    #include <wolfssl/wolfcrypt/port/arm/cryptoCell.h>
 #endif
 
 #ifdef __cplusplus
@@ -117,11 +135,21 @@ enum {
 #endif
 };
 
+#ifdef WC_RSA_NONBLOCK
+typedef struct RsaNb {
+    exptModNb_t exptmod; /* non-block expt_mod */
+    mp_int tmp;
+} RsaNb;
+#endif
+
 /* RSA */
 struct RsaKey {
-    mp_int n, e, d, p, q;
+    mp_int n, e;
+#ifndef WOLFSSL_RSA_PUBLIC_ONLY
+    mp_int d, p, q;
 #if defined(WOLFSSL_KEY_GEN) || defined(OPENSSL_EXTRA) || !defined(RSA_LOW_MEM)
     mp_int dP, dQ, u;
+#endif
 #endif
     void* heap;                               /* for user memory overrides */
     byte* data;                               /* temp buffer for async RSA */
@@ -131,7 +159,7 @@ struct RsaKey {
 #ifdef WC_RSA_BLINDING
     WC_RNG* rng;                              /* for PrivateDecrypt blinding */
 #endif
-#ifdef WOLF_CRYPTO_DEV
+#ifdef WOLF_CRYPTO_CB
     int   devId;
 #endif
 #ifdef WOLFSSL_ASYNC_CRYPT
@@ -149,7 +177,19 @@ struct RsaKey {
     byte id[RSA_MAX_ID_LEN];
     int  idLen;
 #endif
+#if defined(WOLFSSL_ASYNC_CRYPT) || !defined(WOLFSSL_RSA_VERIFY_INLINE)
     byte   dataIsAlloc;
+#endif
+#ifdef WC_RSA_NONBLOCK
+    RsaNb* nb;
+#endif
+#ifdef WOLFSSL_AFALG_XILINX_RSA
+    int alFd;
+    int rdFd;
+#endif
+#if defined(WOLFSSL_CRYPTOCELL)
+    rsa_context_t ctx;
+#endif
 };
 
 #ifndef WC_RSAKEY_TYPE_DEFINED
@@ -237,7 +277,16 @@ WOLFSSL_API int  wc_RsaPublicKeyDecodeRaw(const byte* n, word32 nSz,
     WOLFSSL_API int wc_RsaKeyToDer(RsaKey*, byte* output, word32 inLen);
 #endif
 
-WOLFSSL_API int wc_RsaSetRNG(RsaKey* key, WC_RNG* rng);
+#ifdef WC_RSA_BLINDING
+    WOLFSSL_API int wc_RsaSetRNG(RsaKey* key, WC_RNG* rng);
+#endif
+#ifdef WC_RSA_NONBLOCK
+    WOLFSSL_API int wc_RsaSetNonBlock(RsaKey* key, RsaNb* nb);
+    #ifdef WC_RSA_NONBLOCK_TIME
+    WOLFSSL_API int wc_RsaSetNonBlockTime(RsaKey* key, word32 maxBlockUs,
+                                          word32 cpuMHz);
+    #endif
+#endif
 
 /*
    choice of padding added after fips, so not available when using fips RSA
@@ -271,7 +320,7 @@ WOLFSSL_API int wc_RsaDirect(byte* in, word32 inLen, byte* out, word32* outSz,
                    RsaKey* key, int type, WC_RNG* rng);
 #endif
 
-#endif /* HAVE_FIPS*/
+#endif /* HAVE_FIPS */
 
 WOLFSSL_API int  wc_RsaFlattenPublicKey(RsaKey*, byte*, word32*, byte*,
                                                                        word32*);

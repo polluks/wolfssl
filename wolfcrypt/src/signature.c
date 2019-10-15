@@ -1,6 +1,6 @@
 /* signature.c
  *
- * Copyright (C) 2006-2017 wolfSSL Inc.
+ * Copyright (C) 2006-2019 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -49,35 +49,23 @@
 #ifndef NO_SIG_WRAPPER
 
 #if !defined(NO_RSA) && !defined(NO_ASN)
-static int wc_SignatureDerEncode(enum wc_HashType hash_type, byte** hash_data,
-    word32* hash_len)
+static int wc_SignatureDerEncode(enum wc_HashType hash_type, byte* hash_data,
+    word32 hash_len, word32* hash_enc_len)
 {
-    int ret = wc_HashGetOID(hash_type);
-    if (ret > 0) {
-        int oid = ret;
+    int ret, oid;
 
-        /* Allocate buffer for hash and max DER encoded */
-        word32 digest_len = *hash_len + MAX_DER_DIGEST_SZ;
-        byte *digest_buf = (byte*)XMALLOC(digest_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-        if (digest_buf) {
-            ret = wc_EncodeSignature(digest_buf, *hash_data, *hash_len, oid);
-            if (ret > 0) {
-                digest_len = ret;
-                ret = 0;
-
-                /* Replace hash with digest (DER encoding + hash) */
-                XFREE(*hash_data, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-                *hash_data = digest_buf;
-                *hash_len = digest_len;
-            }
-            else {
-                XFREE(digest_buf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-            }
-        }
-        else {
-            ret = MEMORY_E;
-        }
+    ret = wc_HashGetOID(hash_type);
+    if (ret < 0) {
+        return ret;
     }
+    oid = ret;
+
+    ret = wc_EncodeSignature(hash_data, hash_data, hash_len, oid);
+    if (ret > 0) {
+        *hash_enc_len = ret;
+        ret = 0;
+    }
+
     return ret;
 }
 #endif /* !NO_RSA && !NO_ASN */
@@ -188,6 +176,16 @@ int wc_SignatureVerifyHash(
         case WC_SIGNATURE_TYPE_RSA:
         {
 #ifndef NO_RSA
+#if defined(WOLFSSL_CRYPTOCELL)
+        /* the signature must propagate to the cryptocell to get verfied */
+        ret = wc_RsaSSL_Verify(hash_data, hash_len, (byte*)sig, sig_len, (RsaKey*)key);
+        if (ret != 0) {
+            WOLFSSL_MSG("RSA Signature Verify difference!");
+            ret = SIG_VERIFY_E;
+        }
+
+#else /* WOLFSSL_CRYPTOCELL */
+
             word32 plain_len = hash_len;
             byte *plain_data;
 
@@ -222,6 +220,7 @@ int wc_SignatureVerifyHash(
             else {
                 ret = MEMORY_E;
             }
+#endif /* !WOLFSSL_CRYPTOCELL */
 #else
             ret = SIG_TYPE_E;
 #endif
@@ -244,8 +243,12 @@ int wc_SignatureVerify(
     const void* key, word32 key_len)
 {
     int ret;
-    word32 hash_len;
-    byte *hash_data = NULL;
+    word32 hash_len, hash_enc_len;
+#ifdef WOLFSSL_SMALL_STACK
+    byte *hash_data;
+#else
+    byte hash_data[MAX_DER_DIGEST_SZ];
+#endif
 
     /* Check arguments */
     if (data == NULL || data_len <= 0 ||
@@ -266,13 +269,22 @@ int wc_SignatureVerify(
         WOLFSSL_MSG("wc_SignatureVerify: Invalid hash type/len");
         return ret;
     }
-    hash_len = ret;
+    hash_enc_len = hash_len = ret;
 
+#ifndef NO_RSA
+    if (sig_type == WC_SIGNATURE_TYPE_RSA_W_ENC) {
+        /* For RSA with ASN.1 encoding include room */
+        hash_enc_len += MAX_DER_DIGEST_ASN_SZ;
+    }
+#endif
+
+#ifdef WOLFSSL_SMALL_STACK
     /* Allocate temporary buffer for hash data */
-    hash_data = (byte*)XMALLOC(hash_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    hash_data = (byte*)XMALLOC(hash_enc_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
     if (hash_data == NULL) {
         return MEMORY_E;
     }
+#endif
 
     /* Perform hash of data */
     ret = wc_Hash(hash_type, data, data_len, hash_data, hash_len);
@@ -282,20 +294,21 @@ int wc_SignatureVerify(
         #if defined(NO_RSA) || defined(NO_ASN)
             ret = SIG_TYPE_E;
         #else
-            ret = wc_SignatureDerEncode(hash_type, &hash_data, &hash_len);
+            ret = wc_SignatureDerEncode(hash_type, hash_data, hash_len,
+                &hash_enc_len);
         #endif
         }
 
         if (ret == 0) {
             /* Verify signature using hash */
             ret = wc_SignatureVerifyHash(hash_type, sig_type,
-                hash_data, hash_len, sig, sig_len, key, key_len);
+                hash_data, hash_enc_len, sig, sig_len, key, key_len);
         }
     }
 
-    if (hash_data) {
-        XFREE(hash_data, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-    }
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(hash_data, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
 
     return ret;
 }
@@ -354,7 +367,7 @@ int wc_SignatureGenerateHash(
 
         case WC_SIGNATURE_TYPE_RSA_W_ENC:
         case WC_SIGNATURE_TYPE_RSA:
-#ifndef NO_RSA
+#if !defined(NO_RSA) && !defined(WOLFSSL_RSA_PUBLIC_ONLY)
             /* Create signature using provided RSA key */
             do {
             #ifdef WOLFSSL_ASYNC_CRYPT
@@ -390,8 +403,12 @@ int wc_SignatureGenerate(
     const void* key, word32 key_len, WC_RNG* rng)
 {
     int ret;
-    word32 hash_len;
-    byte *hash_data = NULL;
+    word32 hash_len, hash_enc_len;
+#ifdef WOLFSSL_SMALL_STACK
+    byte *hash_data;
+#else
+    byte hash_data[MAX_DER_DIGEST_SZ];
+#endif
 
     /* Check arguments */
     if (data == NULL || data_len <= 0 ||
@@ -412,36 +429,47 @@ int wc_SignatureGenerate(
         WOLFSSL_MSG("wc_SignatureGenerate: Invalid hash type/len");
         return ret;
     }
-    hash_len = ret;
+    hash_enc_len = hash_len = ret;
 
+#if !defined(NO_RSA) && !defined(WOLFSSL_RSA_PUBLIC_ONLY)
+    if (sig_type == WC_SIGNATURE_TYPE_RSA_W_ENC) {
+        /* For RSA with ASN.1 encoding include room */
+        hash_enc_len += MAX_DER_DIGEST_ASN_SZ;
+    }
+#endif
+
+#ifdef WOLFSSL_SMALL_STACK
     /* Allocate temporary buffer for hash data */
-    hash_data = (byte*)XMALLOC(hash_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    hash_data = (byte*)XMALLOC(hash_enc_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
     if (hash_data == NULL) {
         return MEMORY_E;
     }
+#endif
 
     /* Perform hash of data */
     ret = wc_Hash(hash_type, data, data_len, hash_data, hash_len);
     if (ret == 0) {
         /* Handle RSA with DER encoding */
         if (sig_type == WC_SIGNATURE_TYPE_RSA_W_ENC) {
-        #if defined(NO_RSA) || defined(NO_ASN)
+        #if defined(NO_RSA) || defined(NO_ASN) || \
+                                                defined(WOLFSSL_RSA_PUBLIC_ONLY)
             ret = SIG_TYPE_E;
         #else
-            ret = wc_SignatureDerEncode(hash_type, &hash_data, &hash_len);
+            ret = wc_SignatureDerEncode(hash_type, hash_data, hash_len,
+                &hash_enc_len);
         #endif
         }
 
         if (ret == 0) {
             /* Generate signature using hash */
             ret = wc_SignatureGenerateHash(hash_type, sig_type,
-                hash_data, hash_len, sig, sig_len, key, key_len, rng);
+                hash_data, hash_enc_len, sig, sig_len, key, key_len, rng);
         }
     }
 
-    if (hash_data) {
-        XFREE(hash_data, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-    }
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(hash_data, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
 
     return ret;
 }

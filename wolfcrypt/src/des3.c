@@ -1,6 +1,6 @@
 /* des3.c
  *
- * Copyright (C) 2006-2017 wolfSSL Inc.
+ * Copyright (C) 2006-2019 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -44,6 +44,10 @@
 #endif
 
 #include <wolfssl/wolfcrypt/des3.h>
+
+#ifdef WOLF_CRYPTO_CB
+    #include <wolfssl/wolfcrypt/cryptocb.h>
+#endif
 
 /* fips wrapper calls, user can call direct */
 #if defined(HAVE_FIPS) && \
@@ -1453,6 +1457,12 @@
         }
     #endif /* WOLFSSL_ASYNC_CRYPT */
 
+    #ifdef WOLF_CRYPTO_CB
+        if (des->devId != INVALID_DEVID) {
+            XMEMCPY(des->devKey, key, DES3_KEYLEN);
+        }
+    #endif
+
         ret = DesSetKey(key + (dir == DES_ENCRYPTION ? 0:16), dir, des->key[0]);
         if (ret != 0)
             return ret;
@@ -1587,6 +1597,15 @@
             return BAD_FUNC_ARG;
         }
 
+    #ifdef WOLF_CRYPTO_CB
+        if (des->devId != INVALID_DEVID) {
+            int ret = wc_CryptoCb_Des3Encrypt(des, out, in, sz);
+            if (ret != CRYPTOCB_UNAVAILABLE)
+                return ret;
+            /* fall-through when unavailable */
+        }
+    #endif
+
     #if defined(WOLFSSL_ASYNC_CRYPT) && defined(WC_ASYNC_ENABLE_3DES)
         if (des->asyncDev.marker == WOLFSSL_ASYNC_MARKER_3DES &&
                                             sz >= WC_ASYNC_THRESH_DES3_CBC) {
@@ -1628,6 +1647,15 @@
         if (des == NULL || out == NULL || in == NULL) {
             return BAD_FUNC_ARG;
         }
+
+    #ifdef WOLF_CRYPTO_CB
+        if (des->devId != INVALID_DEVID) {
+            int ret = wc_CryptoCb_Des3Decrypt(des, out, in, sz);
+            if (ret != CRYPTOCB_UNAVAILABLE)
+                return ret;
+            /* fall-through when unavailable */
+        }
+    #endif
 
     #if defined(WOLFSSL_ASYNC_CRYPT)
         if (des->asyncDev.marker == WOLFSSL_ASYNC_MARKER_3DES &&
@@ -1734,11 +1762,16 @@ int wc_Des3Init(Des3* des3, void* heap, int devId)
 
     des3->heap = heap;
 
+#ifdef WOLF_CRYPTO_CB
+    des3->devId = devId;
+    des3->devCtx = NULL;
+#else
+    (void)devId;
+#endif
+
 #if defined(WOLFSSL_ASYNC_CRYPT) && defined(WC_ASYNC_ENABLE_3DES)
     ret = wolfAsync_DevCtxInit(&des3->asyncDev, WOLFSSL_ASYNC_MARKER_3DES,
                                                         des3->heap, devId);
-#else
-    (void)devId;
 #endif
 
     return ret;

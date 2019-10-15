@@ -1,6 +1,6 @@
 /* logging.h
  *
- * Copyright (C) 2006-2017 wolfSSL Inc.
+ * Copyright (C) 2006-2019 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -51,7 +51,9 @@ enum wc_LogLevels {
  *          Do not use WOLFSSL_FUNC_TIME in production code.
  */
 enum wc_FuncNum {
-    WC_FUNC_CLIENT_HELLO_SEND = 0,
+    WC_FUNC_HELLO_REQUEST_SEND = 0,
+    WC_FUNC_HELLO_REQUEST_DO,
+    WC_FUNC_CLIENT_HELLO_SEND,
     WC_FUNC_CLIENT_HELLO_DO,
     WC_FUNC_SERVER_HELLO_SEND,
     WC_FUNC_SERVER_HELLO_DO,
@@ -161,9 +163,10 @@ WOLFSSL_API void wolfSSL_Debugging_OFF(void);
 
 #endif /* DEBUG_WOLFSSL && !WOLFSSL_DEBUG_ERRORS_ONLY */
 
-#if defined(DEBUG_WOLFSSL) || defined(OPENSSL_ALL) || defined(WOLFSSL_NGINX) || defined(WOLFSSL_HAPROXY)
+#if defined(DEBUG_WOLFSSL) || defined(OPENSSL_ALL) || defined(WOLFSSL_NGINX) ||\
+    defined(WOLFSSL_HAPROXY) || defined(OPENSSL_EXTRA)
 
-    #if defined(OPENSSL_EXTRA) || defined(DEBUG_WOLFSSL_VERBOSE)
+    #if (defined(OPENSSL_EXTRA) && !defined(_WIN32)) || defined(DEBUG_WOLFSSL_VERBOSE)
         WOLFSSL_API void WOLFSSL_ERROR_LINE(int err, const char* func, unsigned int line,
             const char* file, void* ctx);
         #define WOLFSSL_ERROR(x) \
