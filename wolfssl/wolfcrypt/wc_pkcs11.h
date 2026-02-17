@@ -1,6 +1,6 @@
 /* wc_pkcs11.h
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -37,11 +37,21 @@
     extern "C" {
 #endif
 
+enum Pkcs11InterfaceVersionType {
+    WC_PCKS11VERSION_2_20,
+    WC_PCKS11VERSION_2_40,
+    WC_PCKS11VERSION_3_0,
+    WC_PCKS11VERSION_3_1,
+    WC_PCKS11VERSION_3_2,
+};
 
 typedef struct Pkcs11Dev {
+#if !defined(HAVE_PKCS11_STATIC) && !defined(HAVE_PKCS11_V3_STATIC)
     void*             dlHandle;         /* Handle to library  */
+#endif
     CK_FUNCTION_LIST* func;             /* Array of functions */
     void*             heap;
+    int               version;          /* Pkcs11InterfaceVersionType */
 } Pkcs11Dev;
 
 typedef struct Pkcs11Token {
@@ -50,12 +60,15 @@ typedef struct Pkcs11Token {
     CK_SESSION_HANDLE handle;           /* Handle to active session           */
     CK_UTF8CHAR_PTR   userPin;          /* User's PIN to login with           */
     CK_ULONG          userPinSz;        /* Size of user's PIN in bytes        */
+    byte              userPinLogin:1;   /* Login with User's PIN              */
+    int               version;          /* Pkcs11InterfaceVersionType         */
 } Pkcs11Token;
 
 typedef struct Pkcs11Session {
     CK_FUNCTION_LIST* func;             /* Table of PKCS#11 function from lib */
     CK_SLOT_ID        slotId;           /* Id of slot to use                  */
     CK_SESSION_HANDLE handle;           /* Handle to active session           */
+    int               version;          /* Pkcs11InterfaceVersionType         */
 } Pkcs11Session;
 
 /* Types of keys that can be stored. */
@@ -67,14 +80,25 @@ enum Pkcs11KeyType {
     PKCS11_KEY_TYPE_EC,
 };
 
-
 WOLFSSL_API int wc_Pkcs11_Initialize(Pkcs11Dev* dev, const char* library,
                                      void* heap);
+WOLFSSL_API int wc_Pkcs11_Initialize_ex(Pkcs11Dev* dev, const char* library,
+                                        void* heap, CK_RV* rvp);
+WOLFSSL_API int wc_Pkcs11_Initialize_v3(Pkcs11Dev* dev, const char* library,
+    void* heap, int* version, const char* interfaceName, CK_RV* rvp);
 WOLFSSL_API void wc_Pkcs11_Finalize(Pkcs11Dev* dev);
 
 WOLFSSL_API int wc_Pkcs11Token_Init(Pkcs11Token* token, Pkcs11Dev* dev,
     int slotId, const char* tokenName, const unsigned char *userPin,
     int userPinSz);
+WOLFSSL_API int wc_Pkcs11Token_Init_NoLogin(Pkcs11Token* token, Pkcs11Dev* dev,
+    int slotId, const char* tokenName);
+WOLFSSL_API int wc_Pkcs11Token_InitName(Pkcs11Token* token, Pkcs11Dev* dev,
+    const char* tokenName, int tokenSz,
+    const unsigned char* userPin, int userPinSz);
+WOLFSSL_API int wc_Pkcs11Token_InitName_NoLogin(Pkcs11Token* token,
+    Pkcs11Dev* dev, const char* tokenName, int tokenSz);
+
 WOLFSSL_API void wc_Pkcs11Token_Final(Pkcs11Token* token);
 WOLFSSL_API int wc_Pkcs11Token_Open(Pkcs11Token* token, int readWrite);
 WOLFSSL_API void wc_Pkcs11Token_Close(Pkcs11Token* token);
@@ -84,6 +108,10 @@ WOLFSSL_API int wc_Pkcs11StoreKey(Pkcs11Token* token, int type, int clear,
 
 WOLFSSL_API int wc_Pkcs11_CryptoDevCb(int devId, wc_CryptoInfo* info,
     void* ctx);
+
+WOLFSSL_LOCAL int wc_hash2sz(int);
+WOLFSSL_LOCAL CK_MECHANISM_TYPE wc_hash2ckm(int);
+WOLFSSL_LOCAL CK_MECHANISM_TYPE wc_mgf2ckm(int);
 
 #ifdef __cplusplus
     } /* extern "C" */

@@ -1,12 +1,12 @@
 /* main.c
  *
- * Copyright (C) 2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -35,7 +35,7 @@
 
 #ifndef NO_CRYPT_BENCHMARK
 
-/*-specs=nano.specs doesn’t include support for floating point in printf()*/
+/*-specs=nano.specs doesn't include support for floating point in printf()*/
 asm (".global _printf_float");
 
 #ifndef RTC_FREQ
@@ -143,12 +143,12 @@ int main(void)
 #ifdef USE_CLOCK_HZ
     /* Speed up clock */
     printf("SiFive HiFive1 Demo\n");
-    printf("Setting clock to %dMHz\n", USE_CLOCK_HZ/1000000);
+    printf("Setting clock to %dMHz\n", (int)(USE_CLOCK_HZ/1000000));
     clk_Hz = metal_clock_set_rate_hz(
         &__METAL_DT_SIFIVE_FE310_G000_PLL_HANDLE->clock, USE_CLOCK_HZ
     );
 #endif
-    printf("Actual Clock %dMHz\n", clk_Hz/1000000);
+    printf("Actual Clock %dMHz\n", (int)(clk_Hz/1000000));
 
     /* Reconfigure the SPI Bus for dual mode */
     #define QSPI0_CTRL       0x10014000UL

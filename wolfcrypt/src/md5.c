@@ -1,12 +1,12 @@
 /* md5.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,13 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-
-
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
-#include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/wolfcrypt/libwolfssl_sources.h>
 
 #if !defined(NO_MD5)
 
@@ -35,8 +29,6 @@
 #else
 
 #include <wolfssl/wolfcrypt/md5.h>
-#include <wolfssl/wolfcrypt/error-crypt.h>
-#include <wolfssl/wolfcrypt/logging.h>
 #include <wolfssl/wolfcrypt/hash.h>
 
 #ifdef NO_INLINE
@@ -48,7 +40,7 @@
 
 
 /* Hardware Acceleration */
-#if defined(STM32_HASH)
+#if defined(STM32_HASH) && !defined(STM32_NOMD5)
 
 /* Supports CubeMX HAL or Standard Peripheral Library */
 #define HAVE_MD5_CUST_API
@@ -78,7 +70,7 @@ int wc_Md5Update(wc_Md5* md5, const byte* data, word32 len)
     ret = wolfSSL_CryptHwMutexLock();
     if (ret == 0) {
         ret = wc_Stm32_Hash_Update(&md5->stmCtx, HASH_AlgoSelection_MD5,
-                                   data, len);
+                                   data, len, WC_MD5_BLOCK_SIZE);
         wolfSSL_CryptHwMutexUnLock();
     }
     return ret;
@@ -115,6 +107,11 @@ int wc_Md5Final(wc_Md5* md5, byte* hash)
 #define XTRANSFORM(S,B)       Transform((S), (B))
 #define XTRANSFORM_LEN(S,B,L) Transform_Len((S), (B), (L))
 
+#ifndef WC_HASH_DATA_ALIGNMENT
+    /* these hardware API's require 4 byte (word32) alignment */
+    #define WC_HASH_DATA_ALIGNMENT 4
+#endif
+
 static int Transform(wc_Md5* md5, const byte* data)
 {
     int ret = wolfSSL_CryptHwMutexLock();
@@ -133,6 +130,25 @@ static int Transform_Len(wc_Md5* md5, const byte* data, word32 len)
 {
     int ret = wolfSSL_CryptHwMutexLock();
     if (ret == 0) {
+    #if defined(WC_HASH_DATA_ALIGNMENT) && WC_HASH_DATA_ALIGNMENT > 0
+        if ((wc_ptr_t)data % WC_HASH_DATA_ALIGNMENT) {
+            /* data pointer is NOT aligned,
+             * so copy and perform one block at a time */
+            byte* local = (byte*)md5->buffer;
+            while (len >= WC_MD5_BLOCK_SIZE) {
+                XMEMCPY(local, data, WC_MD5_BLOCK_SIZE);
+            #ifdef FREESCALE_MMCAU_CLASSIC_SHA
+                cau_md5_hash_n(local, 1, (unsigned char*)md5->digest);
+            #else
+                MMCAU_MD5_HashN(local, 1, (uint32_t*)md5->digest);
+            #endif
+                data += WC_MD5_BLOCK_SIZE;
+                len  -= WC_MD5_BLOCK_SIZE;
+            }
+        }
+        else
+    #endif
+        {
 #ifdef FREESCALE_MMCAU_CLASSIC_SHA
         cau_md5_hash_n((byte*)data, len / WC_MD5_BLOCK_SIZE,
             (unsigned char*)md5->digest);
@@ -140,6 +156,7 @@ static int Transform_Len(wc_Md5* md5, const byte* data, word32 len)
         MMCAU_MD5_HashN((byte*)data, len / WC_MD5_BLOCK_SIZE,
             (uint32_t*)md5->digest);
 #endif
+        }
         wolfSSL_CryptHwMutexUnLock();
     }
     return ret;
@@ -149,7 +166,8 @@ static int Transform_Len(wc_Md5* md5, const byte* data, word32 len)
 #include <wolfssl/wolfcrypt/port/pic32/pic32mz-crypt.h>
 #define HAVE_MD5_CUST_API
 
-#elif defined(WOLFSSL_IMX6_CAAM) && !defined(NO_IMX6_CAAM_HASH)
+#elif defined(WOLFSSL_IMX6_CAAM) && !defined(NO_IMX6_CAAM_HASH) && \
+    !defined(WOLFSSL_QNX_CAAM)
 /* functions implemented in wolfcrypt/src/port/caam/caam_sha.c */
 #define HAVE_MD5_CUST_API
 #else
@@ -160,17 +178,17 @@ static int Transform_Len(wc_Md5* md5, const byte* data, word32 len)
 
 #define XTRANSFORM(S,B)  Transform((S),(B))
 
-#define F1(x, y, z) (z ^ (x & (y ^ z)))
+#define F1(x, y, z) ((z) ^ ((x) & ((y) ^ (z))))
 #define F2(x, y, z) F1(z, x, y)
-#define F3(x, y, z) (x ^ y ^ z)
-#define F4(x, y, z) (y ^ (x | ~z))
+#define F3(x, y, z) ((x) ^ (y) ^ (z))
+#define F4(x, y, z) ((y) ^ ((x) | ~(z)))
 
 #define MD5STEP(f, w, x, y, z, data, s) \
-        w = rotlFixed(w + f(x, y, z) + data, s) + x
+    (w) = (rotlFixed((w) + f(x, y, z) + (data), s) + (x))
 
 static int Transform(wc_Md5* md5, const byte* data)
 {
-    word32* buffer = (word32*)data;
+    const word32* buffer = (const word32*)data;
     /* Copy context->state[] to working vars  */
     word32 a = md5->digest[0];
     word32 b = md5->digest[1];
@@ -277,7 +295,7 @@ static int _InitMd5(wc_Md5* md5)
     md5->buffLen = 0;
     md5->loLen   = 0;
     md5->hiLen   = 0;
-#if defined(WOLFSSL_HASH_FLAGS) || defined(WOLF_CRYPTO_CB)
+#ifdef WOLFSSL_HASH_FLAGS
     md5->flags = 0;
 #endif
 
@@ -379,7 +397,7 @@ int wc_Md5Update(wc_Md5* md5, const byte* data, word32 len)
         /* optimization to avoid memcpy if data pointer is properly aligned */
         /* Big Endian requires byte swap, so can't use data directly */
     #if defined(WC_HASH_DATA_ALIGNMENT) && !defined(BIG_ENDIAN_ORDER)
-        if (((size_t)data % WC_HASH_DATA_ALIGNMENT) == 0) {
+        if (((wc_ptr_t)data % WC_HASH_DATA_ALIGNMENT) == 0) {
             local32 = (word32*)data;
         }
         else
@@ -424,13 +442,21 @@ int wc_Md5Final(wc_Md5* md5, byte* hash)
     }
 #endif /* WOLFSSL_ASYNC_CRYPT */
 
-    local = (byte*)md5->buffer;
+    local = (byte*)md5->buffer; /* buffer allocated in word32 size */
+
+    /* ensure we have a valid buffer length; (-1 to append a byte to length) */
+    if (md5->buffLen > WC_MD5_BLOCK_SIZE - 1) {
+        /* some places consider this BAD_STATE_E */
+        return BUFFER_E;
+    }
 
     local[md5->buffLen++] = 0x80;  /* add 1 */
 
     /* pad with zeros */
     if (md5->buffLen > WC_MD5_PAD_SIZE) {
-        XMEMSET(&local[md5->buffLen], 0, WC_MD5_BLOCK_SIZE - md5->buffLen);
+        if (md5->buffLen < WC_MD5_BLOCK_SIZE) {
+            XMEMSET(&local[md5->buffLen], 0, WC_MD5_BLOCK_SIZE - md5->buffLen);
+        }
         md5->buffLen += WC_MD5_BLOCK_SIZE - md5->buffLen;
 
 #if defined(BIG_ENDIAN_ORDER) && !defined(FREESCALE_MMCAU_SHA)
@@ -513,20 +539,39 @@ int wc_Md5Copy(wc_Md5* src, wc_Md5* dst)
 
     XMEMCPY(dst, src, sizeof(wc_Md5));
 
-#ifdef WOLFSSL_ASYNC_CRYPT
+#if defined(WOLFSSL_ASYNC_CRYPT) && defined(WC_ASYNC_ENABLE_MD5)
     ret = wolfAsync_DevCopy(&src->asyncDev, &dst->asyncDev);
 #endif
 #ifdef WOLFSSL_PIC32MZ_HASH
     ret = wc_Pic32HashCopy(&src->cache, &dst->cache);
 #endif
-#if defined(WOLFSSL_HASH_FLAGS) || defined(WOLF_CRYPTO_CB)
+#ifdef WOLFSSL_HASH_FLAGS
     dst->flags |= WC_HASH_FLAG_ISCOPY;
 #endif
 
     return ret;
 }
 
-#if defined(WOLFSSL_HASH_FLAGS) || defined(WOLF_CRYPTO_CB)
+#if defined(OPENSSL_EXTRA) || defined(HAVE_CURL)
+/* Apply MD5 transformation to the data                   */
+/* @param md5  a pointer to wc_MD5 structure              */
+/* @param data data to be applied MD5 transformation      */
+/* @return 0 on successful, otherwise non-zero on failure */
+int wc_Md5Transform(wc_Md5* md5, const byte* data)
+{
+    /* sanity check */
+    if (md5 == NULL || data == NULL) {
+        return BAD_FUNC_ARG;
+    }
+#ifndef HAVE_MD5_CUST_API
+    return Transform(md5, data);
+#else
+    return NOT_COMPILED_IN;
+#endif
+}
+#endif /* OPENSSL_EXTRA */
+
+#ifdef WOLFSSL_HASH_FLAGS
 int wc_Md5SetFlags(wc_Md5* md5, word32 flags)
 {
     if (md5) {

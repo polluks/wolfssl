@@ -1,12 +1,12 @@
 /* user_settings.h
  *
- * Copyright (C) 2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -41,6 +41,7 @@ extern "C" {
 #endif
 
 #if defined(WOLFSSL_CRYPTOCELL)
+    /* see SASI_AES_KEY_MAX_SIZE_IN_BYTES in the nRF5 SDK */
     #define AES_MAX_KEY_SIZE    128
 #endif /* WOLFSSL_CRYPTOCELL*/
 
@@ -87,7 +88,6 @@ extern "C" {
     #define WOLFSSL_HAVE_SP_RSA
     #define WOLFSSL_HAVE_SP_DH
     #define WOLFSSL_HAVE_SP_ECC
-    #define WOLFSSL_SP_CACHE_RESISTANT
     //#define WOLFSSL_SP_MATH     /* only SP math - eliminates fast math code */
 
     /* Assembly */
@@ -136,6 +136,9 @@ extern "C" {
 #undef HAVE_ECC
 #if 1
     #define HAVE_ECC
+
+    #include <strings.h>
+    /* strings.h required for strncasecmp */
 
     /* Manually define enabled curves */
     #undef  ECC_USER_CURVES
@@ -398,6 +401,7 @@ extern "C" {
 
     /* prototypes for user heap override functions */
     /* Note: Realloc only required for normal math */
+    /* Note2: XFREE(NULL) must be properly handled */
     #include <stddef.h>  /* for size_t */
     extern void *myMalloc(size_t n, void* heap, int type);
     extern void myFree(void *p, void* heap, int type);
@@ -553,12 +557,6 @@ extern "C" {
 
 #undef  NO_OLD_TLS
 #define NO_OLD_TLS
-
-#undef  NO_HC128
-#define NO_HC128
-
-#undef  NO_RABBIT
-#define NO_RABBIT
 
 #undef  NO_PSK
 #define NO_PSK

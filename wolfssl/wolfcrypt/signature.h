@@ -1,12 +1,12 @@
 /* signature.h
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -39,7 +39,7 @@ enum wc_SignatureType {
     WC_SIGNATURE_TYPE_NONE = 0,
     WC_SIGNATURE_TYPE_ECC = 1,
     WC_SIGNATURE_TYPE_RSA = 2,
-    WC_SIGNATURE_TYPE_RSA_W_ENC = 3, /* Adds DER header via wc_EncodeSignature */
+    WC_SIGNATURE_TYPE_RSA_W_ENC = 3 /* Adds DER header via wc_EncodeSignature */
 };
 
 WOLFSSL_API int wc_SignatureGetSize(enum wc_SignatureType sig_type,
@@ -62,12 +62,23 @@ WOLFSSL_API int wc_SignatureGenerateHash(
     const byte* hash_data, word32 hash_len,
     byte* sig, word32 *sig_len,
     const void* key, word32 key_len, WC_RNG* rng);
+WOLFSSL_API int wc_SignatureGenerateHash_ex(
+    enum wc_HashType hash_type, enum wc_SignatureType sig_type,
+    const byte* hash_data, word32 hash_len,
+    byte* sig, word32 *sig_len,
+    const void* key, word32 key_len, WC_RNG* rng, int verify);
 WOLFSSL_API int wc_SignatureGenerate(
     enum wc_HashType hash_type, enum wc_SignatureType sig_type,
     const byte* data, word32 data_len,
     byte* sig, word32 *sig_len,
     const void* key, word32 key_len,
     WC_RNG* rng);
+WOLFSSL_API int wc_SignatureGenerate_ex(
+    enum wc_HashType hash_type, enum wc_SignatureType sig_type,
+    const byte* data, word32 data_len,
+    byte* sig, word32 *sig_len,
+    const void* key, word32 key_len,
+    WC_RNG* rng, int verify);
 
 #ifdef __cplusplus
     } /* extern "C" */

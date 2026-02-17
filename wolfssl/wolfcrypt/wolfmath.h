@@ -1,12 +1,12 @@
 /* wolfmath.h
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,6 +19,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+/*
+DESCRIPTION
+This library provides big integer math functions.
+
+*/
 #ifndef __WOLFMATH_H__
 #define __WOLFMATH_H__
 
@@ -26,10 +31,38 @@
     extern "C" {
 #endif
 
+#include <wolfssl/wolfcrypt/types.h>
+
 #ifdef WOLFSSL_PUBLIC_MP
     #define MP_API   WOLFSSL_API
 #else
     #define MP_API   WOLFSSL_LOCAL
+#endif
+
+
+#if defined(NO_BIG_INT)
+    /* MPI globally disabled -- no PK algorithms supported. */
+    #if defined(USE_FAST_MATH) || defined(USE_INTEGER_HEAP_MATH) || \
+        defined(WOLFSSL_SP_MATH_ALL) || defined(WOLFSSL_SP_MATH) || \
+        defined(HAVE_WOLF_BIGINT) || defined(WOLFSSL_EXPORT_INT)
+        #error Conflicting MPI settings.
+    #endif
+#elif defined(WOLFSSL_SP_MATH_ALL) || defined(WOLFSSL_SP_MATH)
+    #include <wolfssl/wolfcrypt/sp_int.h>
+#elif defined(USE_FAST_MATH)
+    #include <wolfssl/wolfcrypt/tfm.h>
+#elif defined(USE_INTEGER_HEAP_MATH)
+    #include <wolfssl/wolfcrypt/integer.h>
+#else
+    #include <wolfssl/wolfcrypt/sp_int.h>
+#endif
+
+#if !defined(NO_BIG_INT)
+    #include <wolfssl/wolfcrypt/random.h>
+#endif
+
+#if defined(WOLFSSL_MAX3266X) || defined(WOLFSSL_MAX3266X_OLD)
+    #include <wolfssl/wolfcrypt/port/maxim/max3266x.h>
 #endif
 
 #ifndef MIN
@@ -45,25 +78,45 @@
     ((defined(HAVE_ECC) && defined(ECC_TIMING_RESISTANT)) || \
      (defined(USE_FAST_MATH) && defined(TFM_TIMING_RESISTANT)))
 
-    extern const wolfssl_word wc_off_on_addr[2];
+    extern const wc_ptr_t wc_off_on_addr[2];
 #endif
 
-
+#if !defined(NO_BIG_INT)
 /* common math functions */
-MP_API int get_digit_count(mp_int* a);
-MP_API mp_digit get_digit(mp_int* a, int n);
-MP_API int get_rand_digit(WC_RNG* rng, mp_digit* d);
 
+#ifdef WOLFSSL_API_PREFIX_MAP
+    #define mp_get_digit_count wc_mp_get_digit_count
+    #define mp_get_digit wc_mp_get_digit
+    #define mp_get_rand_digit wc_mp_get_rand_digit
+    #define mp_cond_copy wc_mp_cond_copy
+    #define mp_rand wc_mp_rand
+#endif /* WOLFSSL_API_PREFIX_MAP */
+
+MP_API int mp_get_digit_count(const mp_int* a);
+MP_API mp_digit mp_get_digit(const mp_int* a, int n);
+MP_API int mp_get_rand_digit(WC_RNG* rng, mp_digit* d);
+WOLFSSL_LOCAL void mp_reverse(unsigned char *s, int len);
+
+#if defined(HAVE_FIPS) || defined(HAVE_SELFTEST)
+#define get_digit_count mp_get_digit_count
+#define get_digit mp_get_digit
+#define get_rand_digit mp_get_rand_digit
+#endif
+
+WOLFSSL_API int mp_cond_copy(mp_int* a, int copy, mp_int* b);
 WOLFSSL_API int mp_rand(mp_int* a, int digits, WC_RNG* rng);
+#endif
 
-enum {
-    /* format type */
-    WC_TYPE_HEX_STR = 1,
-    WC_TYPE_UNSIGNED_BIN = 2,
-};
+#define WC_TYPE_HEX_STR 1
+#define WC_TYPE_UNSIGNED_BIN 2
+#if defined(WOLFSSL_QNX_CAAM) || defined(WOLFSSL_IMXRT1170_CAAM)
+    #define WC_TYPE_BLACK_KEY 3
+#endif
 
+#if defined(HAVE_ECC) || defined(WOLFSSL_EXPORT_INT)
 WOLFSSL_API int wc_export_int(mp_int* mp, byte* buf, word32* len,
     word32 keySz, int encType);
+#endif
 
 #ifdef HAVE_WOLF_BIGINT
     #if !defined(WOLF_BIGINT_DEFINED)
@@ -88,6 +141,32 @@ WOLFSSL_API int wc_export_int(mp_int* mp, byte* buf, word32* len,
     WOLFSSL_LOCAL int wc_bigint_to_mp(WC_BIGINT* src, mp_int* dst);
 #endif /* HAVE_WOLF_BIGINT */
 
+
+#ifdef HAVE_WC_INTROSPECTION
+    WOLFSSL_API const char *wc_GetMathInfo(void);
+#endif
+
+/* Support for generic Hardware based Math Functions */
+#ifdef WOLFSSL_USE_HW_MP
+
+WOLFSSL_LOCAL int hw_mod(mp_int* multiplier, mp_int* mod, mp_int* result);
+WOLFSSL_LOCAL int hw_mulmod(mp_int* multiplier, mp_int* multiplicand,
+                                mp_int* mod, mp_int* result);
+WOLFSSL_LOCAL int hw_addmod(mp_int* a, mp_int* b, mp_int* mod, mp_int* result);
+WOLFSSL_LOCAL int hw_submod(mp_int* a, mp_int* b, mp_int* mod, mp_int* result);
+WOLFSSL_LOCAL int hw_exptmod(mp_int* base, mp_int* exp, mp_int* mod,
+                                mp_int* result);
+WOLFSSL_LOCAL int hw_sqrmod(mp_int* base, mp_int* mod, mp_int* result);
+
+/* One to one mappings */
+#define mp_mod      hw_mod
+#define mp_addmod   hw_addmod
+#define mp_submod   hw_submod
+#define mp_mulmod   hw_mulmod
+#define mp_exptmod  hw_exptmod
+#define mp_sqrmod   hw_sqrmod
+
+#endif
 
 #ifdef __cplusplus
     } /* extern "C" */

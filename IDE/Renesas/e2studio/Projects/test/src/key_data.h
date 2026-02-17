@@ -1,12 +1,12 @@
 /* key_data.h
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -18,6 +18,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
+
+
 #ifndef KEY_DATA_H_
 #define KEY_DATA_H_
 #include <wolfssl/wolfcrypt/settings.h>
@@ -25,7 +27,7 @@
 #ifdef WOLFSSL_RENESAS_TSIP
 #include "r_tsip_rx_if.h"
 
-/** user key datas */
+/** user key data */
 typedef struct key_block_data
 {
     uint8_t  encrypted_session_key[R_TSIP_AES_CBC_IV_BYTE_SIZE * 2];

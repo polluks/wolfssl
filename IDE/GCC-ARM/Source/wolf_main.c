@@ -1,12 +1,12 @@
 /* wolf_main.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -59,12 +59,12 @@ unsigned int LowResTimer(void)
 /* This is used by wolfCrypt benchmark tool only */
 double current_time(int reset)
 {
-    double time;
-	int timeMs = gTimeMs;
+    double timeNow;
+    int timeMs = gTimeMs;
     (void)reset;
-    time = (timeMs / 1000); // sec
-    time += (double)(timeMs % 1000) / 1000; // ms
-    return time;
+    timeNow = (timeMs / 1000); // sec
+    timeNow += (double)(timeMs % 1000) / 1000; // ms
+    return timeNow;
 }
 #endif
 

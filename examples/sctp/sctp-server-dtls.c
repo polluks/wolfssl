@@ -1,12 +1,12 @@
 /* sctp-server-dtls.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,7 +19,18 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#ifdef HAVE_CONFIG_H
+    #include <config.h>
+#endif
 
+/* wolfssl */
+#ifndef WOLFSSL_USER_SETTINGS
+    #include <wolfssl/options.h>
+#endif
+#include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/ssl.h>
+
+#if defined(WOLFSSL_SCTP) && defined(WOLFSSL_DTLS) && !defined(WOLFSSL_NO_TLS12)
 /* sctp */
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -31,11 +42,6 @@
 #include <string.h>
 #include <unistd.h>
 
-/* wolfssl */
-#include <wolfssl/options.h>
-#include <wolfssl/ssl.h>
-
-
 
 #define key "./certs/server-key.pem"
 #define cert "./certs/server-cert.pem"
@@ -45,9 +51,13 @@ static int err_sys(const char* msg)
     perror(msg);
     exit(EXIT_FAILURE);
 }
+#endif /* WOLFSSL_SCTP && WOLFSSL_DTLS && !WOLFSSL_NO_TLS12 */
 
-int main()
+int main(int argc, char **argv)
 {
+    (void)argc;
+    (void)argv;
+#if defined(WOLFSSL_SCTP) && defined(WOLFSSL_DTLS) && !defined(WOLFSSL_NO_TLS12)
     int sd = socket(PF_INET, SOCK_STREAM, IPPROTO_SCTP);
 
     if (sd < 0)
@@ -119,6 +129,6 @@ int main()
     wolfSSL_CTX_free(ctx);
 
     close(sd);
-
+#endif /* WOLFSSL_SCTP && WOLFSSL_DTLS && !WOLFSSL_NO_TLS12 */
     return 0;
 }

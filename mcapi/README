@@ -47,17 +47,17 @@ Included Project Files
 
 4. wolfCrypt MCAPI Test App (wolfcrypt_mcapi.X)
 
-    This project tests the Microchip crytpo API layer. The Microchip crypto
+    This project tests the Microchip crypto API layer. The Microchip crypto
     layer is located under the <wolfssl_root>/mcapi directory.
 
 5. zlib library (zlib.X)
 
     This project builds the zlib library for use in the wolfcrypt_test.X
     and wolfcrypt_mcapi.X projects. This project expects the zlib sources
-    to be located under the wolfSSL root directory. Currently it is set up
-    to work with zlib 1.2.8, and looks for sources under:
+    to be located under the wolfSSL root directory. It is set up to work
+    with the latest zlib, and looks for sources under:
 
-    <wolfssl_root>/zlib-1.2.8
+    <wolfssl_root>/zlib
 
 PIC32MX/PIC32MZ
 ---------------

@@ -1,12 +1,12 @@
 /* server.h
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -27,10 +27,9 @@
 THREAD_RETURN WOLFSSL_THREAD server_test(void* args);
 
 /* Echo bytes using buffer of blockSize until [echoData] bytes are complete. */
-/* If [bechmarkThroughput] set the statistcs will be output at the end */
+/* If [benchmarkThroughput] set the statistics will be output at the end */
 int ServerEchoData(WOLFSSL* ssl, int clientfd, int echoData, int blockSize,
-                   int benchmarkThroughput);
+                   size_t benchmarkThroughput);
 
 
 #endif /* WOLFSSL_SERVER_H */
-

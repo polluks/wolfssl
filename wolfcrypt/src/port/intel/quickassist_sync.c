@@ -1,12 +1,12 @@
 /* quickassist_sync.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
- * This file is part of wolfSSL. (formerly known as CyaSSL)
+ * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -16,14 +16,14 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
 #ifdef HAVE_CONFIG_H
     #include <config.h>
 #endif
 
-#include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #ifdef HAVE_INTEL_QA_SYNC
 
@@ -42,6 +42,18 @@
 #include <wolfssl/wolfcrypt/cryptocb.h>
 #include <wolfssl/wolfcrypt/port/intel/quickassist_sync.h>
 
+#include "cpa.h"
+#include "cpa_cy_im.h"
+#include "cpa_cy_sym.h"
+#include "cpa_cy_rsa.h"
+#include "cpa_cy_ln.h"
+#include "cpa_cy_ecdh.h"
+#include "cpa_cy_ecdsa.h"
+#include "cpa_cy_dh.h"
+#include "cpa_cy_drbg.h"
+#include "cpa_cy_nrbg.h"
+#include "cpa_cy_prime.h"
+
 #include "icp_sal_user.h"
 #include "icp_sal_poll.h"
 
@@ -53,11 +65,169 @@
     #include <wolfcrypt/src/misc.c>
 #endif
 
+/* User space utils */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
+#if 0
+    /* Optional feature for partial QAT hashing support */
+    /* This will process updates through hardware instead of caching them */
+    #define QAT_HASH_ENABLE_PARTIAL
+#endif
+#ifdef QAT_HASH_ENABLE_PARTIAL
+    #define MAX_QAT_HASH_BUFFERS 2
+#endif
+
+/* Detect QAT driver version */
+#if defined(CPA_CY_API_VERSION_NUM_MAJOR) && CPA_CY_API_VERSION_NUM_MAJOR > 1
+    #define QAT_V2
+#endif
+
+#ifdef QAT_V2
+    /* quickassist/utilities/libusdm_drv/qae_mem.h */
+    /* Provides user-space API's for accessing NUMA allocated memory through usdm_drv */
+    #include "qae_mem.h"
+#include "linux/include/qae_mem_utils.h"
+#endif
+
+#ifdef QAT_USE_POLLING_THREAD
+    #include <pthread.h>
+#endif
+
+/* Tunable parameters */
+#ifndef QAT_PROCESS_NAME
+    #define QAT_PROCESS_NAME     "SSL"
+#endif
+#ifndef QAT_LIMIT_DEV_ACCESS
+    #define QAT_LIMIT_DEV_ACCESS CPA_FALSE
+#endif
+#ifndef QAT_MAX_DEVICES
+    #define QAT_MAX_DEVICES  (1)  /* maximum number of QAT cards */
+#endif
+
+#ifndef QAT_RETRY_LIMIT
+    #define QAT_RETRY_LIMIT  (100)
+#endif
+#ifndef QAT_POLL_RESP_QUOTA
+    #define QAT_POLL_RESP_QUOTA (0) /* all pending */
+#endif
+
+#if !defined(NO_AES) || !defined(NO_DES3)
+    #define QAT_ENABLE_CRYPTO
+#endif
+
+/* Pre-declarations */
+struct IntelQaDev;
+struct wc_CryptoInfo;
+struct WC_BIGINT;
+struct WC_RNG;
+
+
+#if defined(QAT_ENABLE_HASH) || defined(QAT_ENABLE_CRYPTO)
+/* symmetric context */
+typedef struct IntelQaSymCtx {
+    CpaCySymOpData opData;
+    CpaCySymSessionCtx symCtxSrc;
+    CpaCySymSessionCtx symCtx;
+    word32 symCtxSize;
+
+    /* flags */
+    word32 isOpen:1;
+    word32 isCopy:1;
+} IntelQaSymCtx;
+#endif
+
+typedef void (*IntelQaFreeFunc)(struct IntelQaDev*);
+
+
+/* QuickAssist device */
+typedef struct IntelQaDev {
+        CpaInstanceHandle handle;
+    int devId;
+        void* heap;
+
+    /* callback return info */
+    int ret;
+    byte* out;
+    union {
+        word32* outLenPtr;
+        word32 outLen;
+    };
+
+    /* operations */
+    IntelQaFreeFunc freeFunc;
+    union {
+    #ifdef QAT_ENABLE_CRYPTO
+        struct {
+            IntelQaSymCtx ctx;
+            CpaBufferList bufferList;
+            CpaFlatBuffer flatBuffer;
+            byte* authTag;
+            word32 authTagSz;
+        } cipher;
+    #endif
+    } op;
+
+#ifdef QAT_USE_POLLING_THREAD
+    pthread_t pollingThread;
+    byte pollingCy;
+#endif
+} IntelQaDev;
+
+
+/* Interface */
+static int IntelQaHardwareStart(const char*, int);
+static void IntelQaHardwareStop(void);
+static int IntelQaInit(void*);
+static void IntelQaDeInit(int);
+static int IntelQaNumInstances(void);
+static int IntelQaOpen(IntelQaDev*, int);
+static void IntelQaClose(IntelQaDev*);
+static int IntelQaDevCopy(IntelQaDev*, IntelQaDev*);
+static int IntelQaPoll(IntelQaDev*);
+static int IntelQaGetCyInstanceCount(void);
+
+#ifndef NO_AES
+    #ifdef HAVE_AES_CBC
+        static int IntelQaSymAesCbcEncrypt(IntelQaDev*, byte*,
+                const byte*, word32, const byte*, word32, const byte*, word32);
+    #ifdef HAVE_AES_DECRYPT
+        static int IntelQaSymAesCbcDecrypt(IntelQaDev*, byte*,
+                const byte*, word32, const byte*, word32, const byte*, word32);
+    #endif /* HAVE_AES_DECRYPT */
+    #endif /* HAVE_AES_CBC */
+
+    #ifdef HAVE_AESGCM
+        static int IntelQaSymAesGcmEncrypt(IntelQaDev*, byte*,
+                const byte*, word32, const byte*, word32, const byte*, word32,
+                byte*, word32, const byte*, word32);
+    #ifdef HAVE_AES_DECRYPT
+        static int IntelQaSymAesGcmDecrypt(IntelQaDev*, byte*,
+                const byte*, word32, const byte*, word32, const byte*, word32,
+                const byte*, word32, const byte*, word32);
+    #endif /* HAVE_AES_DECRYPT */
+    #endif /* HAVE_AESGCM */
+#endif /* !NO_AES */
+
+#ifndef NO_DES3
+    static int IntelQaSymDes3CbcEncrypt(IntelQaDev*, byte*,
+            const byte*, word32, const byte*, word32, const byte* iv, word32);
+    static int IntelQaSymDes3CbcDecrypt(IntelQaDev* dev, byte*,
+            const byte*, word32, const byte*, word32, const byte* iv, word32);
+#endif /*! NO_DES3 */
+
+#ifdef WOLF_CRYPTO_CB
+    static int IntelQaSymSync_CryptoDevCb(int, struct wc_CryptoInfo*,
+                        void*);
+#endif /* WOLF_CRYPTO_CB */
+
 
 #ifdef QAT_DEBUG
     #define QLOG(...) do { printf(__VA_ARGS__); } while (0)
 #else
-    #define QLOG(...)
+    #define QLOG(...) WC_DO_NOTHING
 #endif
 
 
@@ -92,6 +262,9 @@ static qatCapabilities_t g_qatCapabilities = {0};
 
 
 extern Cpa32U osalLogLevelSet(Cpa32U level);
+
+
+static IntelQaDev qaDev;
 
 
 /* -------------------------------------------------------------------------- */
@@ -186,21 +359,15 @@ void IntelQaHardwareStop(void)
                 status);
     }
 
-    if (g_cyInstMap) {
-        XFREE(g_cyInstMap, NULL, DYNAMIC_TYPE_ASYNC);
-        g_cyInstMap = NULL;
-    }
+    XFREE(g_cyInstMap, NULL, DYNAMIC_TYPE_ASYNC);
+    g_cyInstMap = NULL;
 
-    if (g_cyInstanceInfo) {
-        XFREE(g_cyInstanceInfo, NULL, DYNAMIC_TYPE_ASYNC);
-        g_cyInstanceInfo = NULL;
-    }
+    XFREE(g_cyInstanceInfo, NULL, DYNAMIC_TYPE_ASYNC);
+    g_cyInstanceInfo = NULL;
 
 #ifdef QAT_USE_POLLING_CHECK
-    if (g_cyPolling) {
-        XFREE(g_cyPolling, NULL, DYNAMIC_TYPE_ASYNC);
-        g_cyPolling = NULL;
-    }
+    XFREE(g_cyPolling, NULL, DYNAMIC_TYPE_ASYNC);
+    g_cyPolling = NULL;
     if (g_PollLock) {
         for (i=0; i<g_numInstances; i++) {
             pthread_mutex_destroy(&g_PollLock[i]);
@@ -250,7 +417,7 @@ int IntelQaHardwareStart(const char* process_name, int limitDevAccess)
 
 #ifdef QAT_DEBUG
     /* optionally enable debugging */
-    //osalLogLevelSet(8);
+    /* osalLogLevelSet(8); */
 #endif
 
     status = cpaCyGetNumInstances(&g_numInstances);
@@ -338,7 +505,7 @@ int IntelQaHardwareStart(const char* process_name, int limitDevAccess)
             }
         }
 
-        QLOG("Inst %u, Node: %d, Affin: %u, Dev: %u, Accel %u, "
+        QLOG("Inst %d, Node: %d, Affin: %u, Dev: %u, Accel %u, "
                 "EE %u, BDF %02X:%02X:%02X, isPolled %d\n",
                 i, g_cyInstanceInfo[i].nodeAffinity, coreAffinity,
                 g_cyInstanceInfo[i].physInstId.packageId,
@@ -501,7 +668,7 @@ int IntelQaPoll(IntelQaDev* dev)
     }
 
     {
-        if (dev->ret != WC_PENDING_E) {
+        if (dev->ret != WC_NO_ERR_TRACE(WC_PENDING_E)) {
             /* perform cleanup */
             IntelQaFreeFunc freeFunc = dev->freeFunc;
             QLOG("IntelQaOpFree: Dev %p, FreeFunc %p\n", dev, freeFunc);
@@ -708,31 +875,20 @@ static void IntelQaSymCipherFree(IntelQaDev* dev)
     CpaBufferList* pDstBuffer = &dev->op.cipher.bufferList;
 
     if (opData) {
-        if (opData->pAdditionalAuthData) {
-            XFREE(opData->pAdditionalAuthData, dev->heap,
-                    DYNAMIC_TYPE_ASYNC_NUMA);
-            opData->pAdditionalAuthData = NULL;
-        }
-        if (opData->pIv) {
-            XFREE(opData->pIv, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
-            opData->pIv = NULL;
-        }
+        XFREE(opData->pAdditionalAuthData, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
+        opData->pAdditionalAuthData = NULL;
+        XFREE(opData->pIv, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
+        opData->pIv = NULL;
         XMEMSET(opData, 0, sizeof(CpaCySymOpData));
     }
     if (pDstBuffer) {
         if (pDstBuffer->pBuffers) {
-            if (pDstBuffer->pBuffers->pData) {
-                XFREE(pDstBuffer->pBuffers->pData, dev->heap,
-                        DYNAMIC_TYPE_ASYNC_NUMA);
-                pDstBuffer->pBuffers->pData = NULL;
-            }
+            XFREE(pDstBuffer->pBuffers->pData, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
+            pDstBuffer->pBuffers->pData = NULL;
             XMEMSET(pDstBuffer->pBuffers, 0, sizeof(CpaFlatBuffer));
         }
-        if (pDstBuffer->pPrivateMetaData) {
-            XFREE(pDstBuffer->pPrivateMetaData, dev->heap,
-                    DYNAMIC_TYPE_ASYNC_NUMA);
-            pDstBuffer->pPrivateMetaData = NULL;
-        }
+        XFREE(pDstBuffer->pPrivateMetaData, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
+        pDstBuffer->pPrivateMetaData = NULL;
         XMEMSET(pDstBuffer, 0, sizeof(CpaBufferList));
     }
 
@@ -743,7 +899,11 @@ static void IntelQaSymCipherFree(IntelQaDev* dev)
     dev->out = NULL;
     dev->outLen = 0;
 #ifndef NO_AES
-    dev->op.cipher.authTag = NULL;
+    if (dev->op.cipher.authTag != NULL) {
+        XMEMSET(dev->op.cipher.authTag, 0, dev->op.cipher.authTagSz);
+        XFREE(dev->op.cipher.authTag, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
+        dev->op.cipher.authTag = NULL;
+    }
     dev->op.cipher.authTagSz = 0;
 #endif
 }
@@ -772,7 +932,9 @@ static int IntelQaSymCipher(IntelQaDev* dev, byte* out, const byte* in,
     Cpa32U metaSize = 0;
     Cpa8U* authInBuf = NULL;
     Cpa32U authInSzAligned = authInSz;
+    Cpa8U* authTagBuf = NULL;
     IntelQaSymCtx* ctx;
+    CpaBoolean verifyResult = CPA_FALSE;
 
     QLOG("IntelQaSymCipher: dev %p, out %p, in %p, inOutSz %d, op %d, "
             "algo %d, dir %d, hash %d\n",
@@ -806,38 +968,29 @@ static int IntelQaSymCipher(IntelQaDev* dev, byte* out, const byte* in,
     bufferList = &dev->op.cipher.bufferList;
     flatBuffer = &dev->op.cipher.flatBuffer;
     metaBuf = XMALLOC(metaSize, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
-#ifndef WOLFSSL_SNIFFER
-    dataBuf = XREALLOC((byte*)in, dataLen, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
-    ivBuf = XREALLOC((byte*)iv, AES_BLOCK_SIZE, dev->heap,
-            DYNAMIC_TYPE_ASYNC_NUMA);
-#else
     dataBuf = XMALLOC(dataLen, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
     XMEMCPY(dataBuf, in, inOutSz);
-    ivBuf = XMALLOC(AES_BLOCK_SIZE, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
+    ivBuf = XMALLOC(WC_AES_BLOCK_SIZE, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
     XMEMCPY(ivBuf, iv, ivSz);
-#endif
+    authTagBuf = XMALLOC(authTagSz, dev->heap, DYNAMIC_TYPE_ASYNC_NUMA);
 
     /* check allocations */
-    if (ivBuf == NULL || metaBuf == NULL || dataBuf == NULL) {
+    if (ivBuf == NULL || metaBuf == NULL || dataBuf == NULL ||
+        authTagBuf == NULL) {
         ret = MEMORY_E; goto exit;
     }
 
     /* AAD */
     if (authIn && authInSz > 0) {
         /* make sure AAD is block aligned */
-        if (authInSzAligned % AES_BLOCK_SIZE) {
-            authInSzAligned += AES_BLOCK_SIZE -
-                (authInSzAligned % AES_BLOCK_SIZE);
+        if (authInSzAligned % WC_AES_BLOCK_SIZE) {
+            authInSzAligned += WC_AES_BLOCK_SIZE -
+                (authInSzAligned % WC_AES_BLOCK_SIZE);
         }
 
-#ifndef WOLFSSL_SNIFFER
-        authInBuf = XREALLOC((byte*)authIn, authInSzAligned, dev->heap,
-            DYNAMIC_TYPE_ASYNC_NUMA);
-#else
         authInBuf = XMALLOC(authInSzAligned, dev->heap,
                 DYNAMIC_TYPE_ASYNC_NUMA);
         XMEMCPY(authInBuf, authIn, authInSz);
-#endif
         if (authInBuf == NULL) {
             ret = MEMORY_E; goto exit;
         }
@@ -878,7 +1031,10 @@ static int IntelQaSymCipher(IntelQaDev* dev, byte* out, const byte* in,
         setup.hashSetupData.digestResultLenInBytes = authTagSz;
         setup.hashSetupData.authModeSetupData.aadLenInBytes = authInSz;
 
-        setup.digestIsAppended = CPA_TRUE;
+        if (cipherDirection == CPA_CY_SYM_CIPHER_DIRECTION_DECRYPT)
+            setup.digestIsAppended = CPA_TRUE;
+        else
+            setup.digestIsAppended = CPA_FALSE;
     }
 
     /* open session */
@@ -903,13 +1059,19 @@ static int IntelQaSymCipher(IntelQaDev* dev, byte* out, const byte* in,
             XMEMCPY(flatBuffer->pData + inOutSz, authTag, authTagSz);
         }
     }
+    else {
+        if (authTag && authTagSz > 0) {
+            XMEMCPY(authTagBuf, authTag, authTagSz);
+        }
+    }
 
     /* store info needed for output */
     dev->out = out;
     dev->outLen = inOutSz;
     if (cipherDirection == CPA_CY_SYM_CIPHER_DIRECTION_ENCRYPT) {
-        dev->op.cipher.authTag = authTag;
+        dev->op.cipher.authTag = authTagBuf;
         dev->op.cipher.authTagSz = authTagSz;
+        opData->pDigestResult = authTagBuf;
     }
     else {
         dev->op.cipher.authTag = NULL;
@@ -920,11 +1082,16 @@ static int IntelQaSymCipher(IntelQaDev* dev, byte* out, const byte* in,
     /* perform symmetric AES operation async */
     /* use same buffer list for in-place operation */
     status = cpaCySymPerformOp(dev->handle, dev, opData,
-            bufferList, bufferList, NULL);
+            bufferList, bufferList, &verifyResult);
 
-    if (ret == WC_PENDING_E)
-        return ret;
-
+    if (symOperation == CPA_CY_SYM_OP_ALGORITHM_CHAINING &&
+        cipherAlgorithm == CPA_CY_SYM_CIPHER_AES_GCM &&
+        cipherDirection == CPA_CY_SYM_CIPHER_DIRECTION_DECRYPT &&
+        hashAlgorithm == CPA_CY_SYM_HASH_AES_GCM) {
+        if (verifyResult == CPA_FALSE) {
+            ret = AES_GCM_AUTH_E;
+        }
+    }
 exit:
 
     if (ret != 0) {
@@ -932,10 +1099,13 @@ exit:
             dev, status, ret);
     }
 
-#ifdef WOLFSSL_SNIFFER
     /* Capture the inline decrypt into the output. */
     XMEMCPY(out, dataBuf, inOutSz);
-#endif
+    if (cipherDirection == CPA_CY_SYM_CIPHER_DIRECTION_ENCRYPT) {
+        if (authTag != NULL && authTagSz > 0) {
+            XMEMCPY(authTag, authTagBuf, authTagSz);
+        }
+    }
 
     /* handle cleanup */
     IntelQaSymCipherFree(dev);
@@ -949,11 +1119,14 @@ int IntelQaSymAesCbcEncrypt(IntelQaDev* dev,
             const byte* key, word32 keySz,
             const byte* iv, word32 ivSz)
 {
-    return IntelQaSymCipher(dev, out, in, sz,
+    int ret = IntelQaSymCipher(dev, out, in, sz,
         key, keySz, iv, ivSz,
         CPA_CY_SYM_OP_CIPHER, CPA_CY_SYM_CIPHER_AES_CBC,
         CPA_CY_SYM_CIPHER_DIRECTION_ENCRYPT,
         CPA_CY_SYM_HASH_NONE, NULL, 0, NULL, 0);
+
+    XMEMCPY((byte*)iv, out + sz - WC_AES_BLOCK_SIZE, WC_AES_BLOCK_SIZE);
+    return ret;
 }
 
 #ifdef HAVE_AES_DECRYPT
@@ -962,11 +1135,18 @@ int IntelQaSymAesCbcDecrypt(IntelQaDev* dev,
             const byte* key, word32 keySz,
             const byte* iv, word32 ivSz)
 {
-    return IntelQaSymCipher(dev, out, in, sz,
+    byte nextIv[WC_AES_BLOCK_SIZE];
+    int ret;
+
+    XMEMCPY(nextIv, in + sz - WC_AES_BLOCK_SIZE, WC_AES_BLOCK_SIZE);
+    ret = IntelQaSymCipher(dev, out, in, sz,
         key, keySz, iv, ivSz,
         CPA_CY_SYM_OP_CIPHER, CPA_CY_SYM_CIPHER_AES_CBC,
         CPA_CY_SYM_CIPHER_DIRECTION_DECRYPT,
         CPA_CY_SYM_HASH_NONE, NULL, 0, NULL, 0);
+
+    XMEMCPY((byte*)iv, nextIv, WC_AES_BLOCK_SIZE);
+    return ret;
 }
 #endif /* HAVE_AES_DECRYPT */
 #endif /* HAVE_AES_CBC */
@@ -1061,7 +1241,7 @@ int IntelQaSymSync_CryptoDevCb(int devId, struct wc_CryptoInfo* info, void* ctx)
                         info->cipher.aescbc.in,
                         info->cipher.aescbc.sz,
                         (byte*)aes->devKey, aes->keylen,
-                        (byte*)aes->reg, AES_BLOCK_SIZE);
+                        (byte*)aes->reg, WC_AES_BLOCK_SIZE);
             }
             else {
                 rc = IntelQaSymAesCbcDecrypt(dev,
@@ -1069,7 +1249,7 @@ int IntelQaSymSync_CryptoDevCb(int devId, struct wc_CryptoInfo* info, void* ctx)
                         info->cipher.aescbc.in,
                         info->cipher.aescbc.sz,
                         (byte*)aes->devKey, aes->keylen,
-                        (byte*)aes->reg, AES_BLOCK_SIZE);
+                        (byte*)aes->reg, WC_AES_BLOCK_SIZE);
             }
         }
         #endif /* !NO_AES */
@@ -1141,6 +1321,52 @@ int IntelQaSymSync_CryptoDevCb(int devId, struct wc_CryptoInfo* info, void* ctx)
     #endif /* QAT_ENABLE_CRYPTO */
 
     return rc;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Public API                                                                 */
+/* -------------------------------------------------------------------------- */
+
+int wc_CryptoCb_InitIntelQa(void)
+{
+    int devId, rc;
+
+    devId = IntelQaInit(NULL);
+    if (devId < 0) {
+        QLOG("Couldn't init the Intel QA\n");
+        devId = INVALID_DEVID;
+    }
+    else {
+        rc = IntelQaOpen(&qaDev, devId);
+        if (rc != 0) {
+            QLOG("Couldn't open the device\n");
+            IntelQaDeInit(devId);
+            devId = INVALID_DEVID;
+        }
+        else {
+            rc = wc_CryptoCb_RegisterDevice(devId,
+                    IntelQaSymSync_CryptoDevCb, &qaDev);
+            if (rc != 0) {
+                QLOG("Couldn't register the device\n");
+                IntelQaClose(&qaDev);
+                IntelQaDeInit(devId);
+                devId = INVALID_DEVID;
+            }
+        }
+    }
+
+    return devId;
+}
+
+
+void wc_CryptoCb_CleanupIntelQa(int* id)
+{
+    if (INVALID_DEVID != *id) {
+        wc_CryptoCb_UnRegisterDevice(*id);
+        IntelQaClose(&qaDev);
+        IntelQaDeInit(*id);
+        *id = INVALID_DEVID;
+    }
 }
 
 #endif /* WOLF_CRYPTO_CB */
@@ -1289,7 +1515,7 @@ static void _qaeMemFree(void *ptr, void* heap, int type
 
 #ifdef WOLFSSL_DEBUG_MEMORY
 #ifdef WOLFSSL_DEBUG_MEMORY_PRINT
-    printf("Free: %p (%u) at %s:%d, heap %p, type %d, count %d\n",
+    printf("Free: %p (%u) at %s:%u, heap %p, type %d, count %d\n",
         origPtr, (unsigned int)size, func, line, heap, type, header->count);
 #else
     (void)func;
@@ -1385,7 +1611,7 @@ static void* _qaeMemAlloc(size_t size, void* heap, int type
         ptr = qaeMemAllocNUMA((Cpa32U)(size + sizeof(qaeMemHeader)), 0,
             alignment);
     }
-    else if (ptr == NULL) {
+    else {
         isNuma = 0;
         ptr = malloc(size + sizeof(qaeMemHeader));
     }
@@ -1437,7 +1663,7 @@ static void* _qaeMemAlloc(size_t size, void* heap, int type
 
 #ifdef WOLFSSL_DEBUG_MEMORY
 #ifdef WOLFSSL_DEBUG_MEMORY_PRINT
-    printf("Alloc: %p (%u) at %s:%d, heap %p, type %d\n",
+    printf("Alloc: %p (%u) at %s:%u, heap %p, type %d\n",
         ptr, (unsigned int)size, func, line, heap, type);
 #else
     (void)func;
@@ -1451,7 +1677,7 @@ static void* _qaeMemAlloc(size_t size, void* heap, int type
 }
 
 /* Public Functions */
-void* IntelQaMalloc(size_t size, void* heap, int type
+void* wc_CryptoCb_IntelQaMalloc(size_t size, void* heap, int type
 #ifdef WOLFSSL_DEBUG_MEMORY
     , const char* func, unsigned int line
 #endif
@@ -1480,7 +1706,7 @@ void* IntelQaMalloc(size_t size, void* heap, int type
     return ptr;
 }
 
-void IntelQaFree(void *ptr, void* heap, int type
+void wc_CryptoCb_IntelQaFree(void *ptr, void* heap, int type
 #ifdef WOLFSSL_DEBUG_MEMORY
     , const char* func, unsigned int line
 #endif
@@ -1505,7 +1731,7 @@ void IntelQaFree(void *ptr, void* heap, int type
 #endif
 }
 
-void* IntelQaRealloc(void *ptr, size_t size, void* heap, int type
+void* wc_CryptoCb_IntelQaRealloc(void *ptr, size_t size, void* heap, int type
 #ifdef WOLFSSL_DEBUG_MEMORY
     , const char* func, unsigned int line
 #endif
@@ -1538,6 +1764,10 @@ void* IntelQaRealloc(void *ptr, size_t size, void* heap, int type
 
             /* for non-NUMA, treat as normal REALLOC */
             if (newIsNuma == 0 && ptrIsNuma == 0) {
+                allocNew = 1;
+            }
+            /* confirm input is aligned, otherwise allocate new */
+            else if (((size_t)ptr % WOLF_HEADER_ALIGN) != 0) {
                 allocNew = 1;
             }
             /* if matching NUMA type and size fits, use existing */
@@ -1598,11 +1828,11 @@ void* IntelQaRealloc(void *ptr, size_t size, void* heap, int type
 #ifdef WOLFSSL_DEBUG_MEMORY
 #ifdef WOLFSSL_DEBUG_MEMORY_PRINT
     if (allocNew) {
-        printf("Realloc: New %p -> %p (%u) at %s:%d, heap %p, type %d\n",
+        printf("Realloc: New %p -> %p (%u) at %s:%u, heap %p, type %d\n",
             origPtr, newPtr, (unsigned int)size, func, line, heap, type);
     }
     else {
-        printf("Realloc: Reuse %p (%u) at %s:%d, heap %p, type %d, count %d\n",
+        printf("Realloc: Reuse %p (%u) at %s:%u, heap %p, type %d, count %d\n",
              origPtr, (unsigned int)size, func, line, header->heap, header->type, header->count);
     }
 #else
@@ -1720,12 +1950,13 @@ static byte aesgcm_t[] = {
 /* simple example of using AES-GCM encrypt with Intel QA */
 int main(int argc, char** argv)
 {
+#if !defined(NO_AES) && defined(HAVE_AESGCM)
     int ret;
     IntelQaDev dev;
     byte out[256];
-    word32 outLen = sizeof(out);
     byte tmp[256];
-    word32 tmpLen = sizeof(tmp);
+    word32 tmpLen;
+#endif
 
 #ifdef QAT_DEBUG
     wolfSSL_Debugging_ON();
@@ -1749,9 +1980,6 @@ int main(int argc, char** argv)
     IntelQaClose(&dev);
 #endif /* HAVE_AESGCM */
 #endif /* NO_AES */
-
-    (void)tmp;
-    (void)tmpLen;
 
     IntelQaDeInit(0);
 

@@ -1,12 +1,12 @@
 /* current-time.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -44,7 +44,7 @@ void InitTimer(void) {
                                        SYSCTL_USE_PLL |
                                        SYSCTL_CFG_VCO_480), 120000000);
 
-    printf("Clock=%dMHz\n", ui32SysClock/1000000) ;
+    printf("Clock=%dMHz\n", (int)(ui32SysClock/1000000));
     ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
     ROM_TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);
     ROM_TimerLoadSet(TIMER0_BASE, TIMER_A, -1);
@@ -64,10 +64,10 @@ double current_time(int reset)
 
 /* dummy */
 double current_time(int reset) {
-    static double t; 
-    t += 1.0; /* for avoid infinit loop of waiting time */
+    static double t;
+    t += 1.0; /* for avoid infinite loop of waiting time */
     if(reset)t = 0.0;
-    return t ; 
-} 
+    return t ;
+}
 
 #endif

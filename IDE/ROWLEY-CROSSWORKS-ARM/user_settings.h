@@ -18,12 +18,16 @@ extern "C" {
 #undef  SINGLE_THREADED
 #define SINGLE_THREADED
 
+#undef WOLFSSL_NO_SOCK
+#define WOLFSSL_NO_SOCK
+
 #undef  WOLFSSL_SMALL_STACK
 //#define WOLFSSL_SMALL_STACK
 
 #undef  WOLFSSL_SMALL_STACK_CACHE
 //#define WOLFSSL_SMALL_STACK_CACHE
 
+#define WOLFSSL_IGNORE_FILE_WARN
 
 /* ------------------------------------------------------------------------- */
 /* Math Configuration */
@@ -43,6 +47,24 @@ extern "C" {
 /* Math debugging (adds support for mp_dump) */
 #undef  WOLFSSL_DEBUG_MATH
 //#define WOLFSSL_DEBUG_MATH
+
+/* Wolf Single Precision Math */
+#undef WOLFSSL_SP
+#if 0
+    #define WOLFSSL_SP
+    #define WOLFSSL_SP_SMALL      /* use smaller version of code */
+    #define WOLFSSL_HAVE_SP_RSA
+    #define WOLFSSL_HAVE_SP_DH
+    #define WOLFSSL_HAVE_SP_ECC
+    #define WOLFSSL_SP_MATH     /* only SP math - eliminates fast math code */
+
+    /* SP Assembly Speedups */
+    #define WOLFSSL_SP_ASM      /* required if using the ASM versions */
+    //#define WOLFSSL_SP_ARM32_ASM
+    //#define WOLFSSL_SP_ARM64_ASM
+    //#define WOLFSSL_SP_ARM_THUMB_ASM
+    #define WOLFSSL_SP_ARM_CORTEX_M_ASM
+#endif
 
 
 /* ------------------------------------------------------------------------- */
@@ -386,12 +408,6 @@ extern unsigned int custom_rand_generate(void);
 
 #undef  NO_OLD_TLS
 #define NO_OLD_TLS
-
-#undef  NO_HC128
-#define NO_HC128
-
-#undef  NO_RABBIT
-#define NO_RABBIT
 
 #undef  NO_PSK
 #define NO_PSK

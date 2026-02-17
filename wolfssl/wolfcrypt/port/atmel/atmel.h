@@ -1,12 +1,12 @@
 /* atmel.h
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -27,14 +27,13 @@
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
 
-#if defined(WOLFSSL_ATECC508A) || defined(WOLFSSL_ATECC_PKCB)
-    #undef  SHA_BLOCK_SIZE
-    #define SHA_BLOCK_SIZE  SHA_BLOCK_SIZE_REMAP
-    #include <cryptoauthlib.h>
+#if defined(WOLFSSL_ATECC508A) || defined(WOLFSSL_ATECC608A) || \
+    defined(WOLFSSL_ATECC_PKCB)
     #undef SHA_BLOCK_SIZE
+    #include <cryptoauthlib.h>
 #endif
 
-/* ATECC508A only supports ECC P-256 */
+/* ATECC508A/608A only supports ECC P-256 */
 #define ATECC_KEY_SIZE      (32)
 #define ATECC_PUBKEY_SIZE   (ATECC_KEY_SIZE*2) /* X and Y */
 #define ATECC_SIG_SIZE      (ATECC_KEY_SIZE*2) /* R and S */
@@ -53,11 +52,19 @@
 #endif
 /* Symmetric encryption key */
 #ifndef ATECC_SLOT_I2C_ENC
-#define ATECC_SLOT_I2C_ENC        (0x04)
+    #ifdef WOLFSSL_ATECC_TNGTLS
+        #define ATECC_SLOT_I2C_ENC        (0x06)
+    #else
+        #define ATECC_SLOT_I2C_ENC        (0x04)
+    #endif
 #endif
 /* Parent encryption key */
 #ifndef ATECC_SLOT_ENC_PARENT
-#define ATECC_SLOT_ENC_PARENT     (0x7)
+    #ifdef WOLFSSL_ATECC_TNGTLS
+        #define ATECC_SLOT_ENC_PARENT     (0x6)
+    #else
+        #define ATECC_SLOT_ENC_PARENT     (0x7)
+    #endif
 #endif
 
 /* ATECC_KEY_SIZE required for ecc.h */
@@ -78,7 +85,7 @@ int  atmel_get_random_number(uint32_t count, uint8_t* rand_out);
 #endif
 long atmel_get_curr_time_and_date(long* tm);
 
-#ifdef WOLFSSL_ATECC508A
+#if defined(WOLFSSL_ATECC508A) || defined(WOLFSSL_ATECC608A)
 
 enum atmelSlotType {
     ATMEL_SLOT_ANY,
@@ -100,6 +107,8 @@ int  atmel_ecc_translate_err(int status);
 int  atmel_get_rev_info(word32* revision);
 void atmel_show_rev_info(void);
 
+WOLFSSL_API int wolfCrypt_ATECC_SetConfig(ATCAIfaceCfg* cfg);
+
 /* The macro ATECC_GET_ENC_KEY can be set to override the default
    encryption key with your own at build-time */
 #ifndef ATECC_GET_ENC_KEY
@@ -110,7 +119,7 @@ int  atmel_ecc_create_pms(int slotId, const uint8_t* peerKey, uint8_t* pms);
 int  atmel_ecc_create_key(int slotId, byte* peerKey);
 int  atmel_ecc_sign(int slotId, const byte* message, byte* signature);
 int  atmel_ecc_verify(const byte* message, const byte* signature,
-    const byte* pubkey, int* verified);
+    const byte* pubkey, int* pVerified);
 
 #endif /* WOLFSSL_ATECC508A */
 

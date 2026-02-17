@@ -1,12 +1,12 @@
 ﻿/* wolfSSL-Example-IOCallbacks.cs
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -18,6 +18,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
+
+
 
 
 using System;
@@ -35,18 +37,18 @@ using wolfSSL.CSharp;
 class wolfSSL_Example_IOCallbacks
 {
     /// <summary>
-    /// Example call back to allow recieving TLS information
+    /// Example call back to allow receiving TLS information
     /// </summary>
     /// <param name="ssl">structure of ssl passed in</param>
-    /// <param name="buf">buffer to contain recieved msg</param>
+    /// <param name="buf">buffer to contain received msg</param>
     /// <param name="sz">size of buffer for receiving</param>
     /// <param name="ctx">information passed in from set_fd</param>
-    /// <returns>size of message recieved</returns>
+    /// <returns>size of message received</returns>
     private static int wolfSSLCbIORecv(IntPtr ssl, IntPtr buf, int sz, IntPtr ctx)
     {
         if (sz <= 0)
         {
-            wolfssl.log(wolfssl.ERROR_LOG, "wolfssl recieve error, size less than 0");
+            wolfssl.log(wolfssl.ERROR_LOG, "wolfssl receive error, size less than 0");
             return wolfssl.CBIO_ERR_GENERAL;
         }
 
@@ -64,7 +66,7 @@ class wolfSSL_Example_IOCallbacks
         }
         catch (Exception e)
         {
-            wolfssl.log(wolfssl.ENTER_LOG, "Error in recive " + e.ToString());
+            wolfssl.log(wolfssl.ENTER_LOG, "Error in receive " + e.ToString());
             return wolfssl.CBIO_ERR_CONN_CLOSE;
         }
 
@@ -120,12 +122,12 @@ class wolfSSL_Example_IOCallbacks
     /// <returns>size of key set</returns>
     public static uint my_psk_server_cb(IntPtr ssl, string identity, IntPtr key, uint max_key)
     {
-        /* perform a check on the identity sent across 
+        /* perform a check on the identity sent across
          * log function must be set for print out of logging information
          */
         wolfssl.log(wolfssl.INFO_LOG, "PSK Client Identity = " + identity);
 
-        /* Use desired key, note must be a key smaller than max key size parameter 
+        /* Use desired key, note must be a key smaller than max key size parameter
             Replace this with desired key. Is trivial one for testing */
         if (max_key < 4)
             return 0;
@@ -135,6 +137,68 @@ class wolfSSL_Example_IOCallbacks
         return (uint)4;
     }
 
+    /// <summary>
+    /// Example of a certificate verify function
+    /// </summary>
+    /// <param name="preverify"></param>
+    /// <param name="store">pointer to a WOLFSSL_X509_STORE_CTX</param>
+    /// <returns>size of key set</returns>
+    public static int my_verify_cb(int preverify, IntPtr store)
+    {
+        if (store == IntPtr.Zero)
+        {
+            Console.WriteLine("store is null");
+        }
+
+        Console.WriteLine("Status of certificate verify = " + preverify);
+        Console.WriteLine("Error value for cert store is " + wolfssl.X509_STORE_CTX_get_error(store));
+
+        /* look at the current cert in store */
+        try
+        {
+
+            X509 x509 = wolfssl.X509_STORE_CTX_get_current_cert(store);
+
+
+            Console.WriteLine("Issuer : " + x509.Issuer);
+            Console.WriteLine("Subject : " + x509.Subject);
+
+            Console.WriteLine("PEM of certificate:");
+            Console.WriteLine(System.Text.Encoding.UTF8.GetString(x509.Export()));
+
+            Console.WriteLine("DER of certificate:");
+            Console.WriteLine(BitConverter.ToString(x509.Export(wolfssl.SSL_FILETYPE_ASN1)));
+
+            Console.WriteLine("Public key:");
+            Console.WriteLine(BitConverter.ToString(x509.GetPublicKey()));
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("Unable to get X509's" + e);
+        }
+
+        /* list all certs in store */
+        try
+        {
+            int i;
+            X509[] x509 = wolfssl.X509_STORE_CTX_get_certs(store);
+
+            for (i = 0; i < x509.Length; i++)
+            {
+                Console.WriteLine("CERT[" + i + "]");
+                Console.WriteLine("Issuer : " + x509[i].Issuer);
+                Console.WriteLine("Subject : " + x509[i].Subject);
+                Console.WriteLine("");
+            }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("Unable to get X509's" + e);
+        }
+
+        /* by returning 1 here we override any failure and report success */
+        return preverify;
+    }
 
     private static void clean(IntPtr ssl, IntPtr ctx)
     {
@@ -150,11 +214,17 @@ class wolfSSL_Example_IOCallbacks
         IntPtr ssl;
         Socket fd;
 
-        wolfssl.psk_delegate psk_cb = new wolfssl.psk_delegate(my_psk_server_cb);
+        wolfssl.CallbackVerify_delegate verify_cb = new wolfssl.CallbackVerify_delegate(my_verify_cb);
 
         /* These paths should be changed according to use */
-        string fileCert = @"server-cert.pem";
-        string fileKey = @"server-key.pem";
+        string fileCert = wolfssl.setPath("server-cert.pem");
+        string fileKey = wolfssl.setPath("server-key.pem");
+        StringBuilder dhparam = new StringBuilder(wolfssl.setPath("dh2048.pem"));
+
+        if (fileCert == "" || fileKey == "" || dhparam.Length == 0) {
+            Console.WriteLine("Platform not supported");
+            return;
+        }
 
         StringBuilder buff = new StringBuilder(1024);
         StringBuilder reply = new StringBuilder("Hello, this is the wolfSSL C# wrapper");
@@ -177,6 +247,12 @@ class wolfSSL_Example_IOCallbacks
             return;
         }
 
+        if (!File.Exists(dhparam.ToString())) {
+            Console.WriteLine("Could not find dh file");
+            wolfssl.CTX_free(ctx);
+            return;
+        }
+
         if (wolfssl.CTX_use_certificate_file(ctx, fileCert, wolfssl.SSL_FILETYPE_PEM) != wolfssl.SUCCESS)
         {
             Console.WriteLine("Error in setting cert file");
@@ -191,30 +267,7 @@ class wolfSSL_Example_IOCallbacks
             return;
         }
 
-        StringBuilder ciphers = new StringBuilder(new String(' ', 4096));
-        wolfssl.get_ciphers(ciphers, 4096);
-        Console.WriteLine("Ciphers : " + ciphers.ToString());
-
-        Console.Write("Setting cipher suite to ");
-        /* To use static PSK build wolfSSL with WOLFSSL_STATIC_PSK preprocessor flag */
-        StringBuilder set_cipher = new StringBuilder("PSK-AES128-CBC-SHA256");
-        Console.WriteLine(set_cipher);
-        if (wolfssl.CTX_set_cipher_list(ctx, set_cipher) != wolfssl.SUCCESS)
-        {
-            Console.WriteLine("Failed to set cipher suite");
-            Console.WriteLine("If using static PSK make sure wolfSSL was built with preprocessor flag WOLFSSL_STATIC_PSK");
-            wolfssl.CTX_free(ctx);
-            return;
-        }
-
-        /* Test psk use */
-        StringBuilder hint = new StringBuilder("cyassl server");
-        if (wolfssl.CTX_use_psk_identity_hint(ctx, hint) != wolfssl.SUCCESS)
-        {
-            Console.WriteLine("Error setting hint");
-            return;
-        }
-        wolfssl.CTX_set_psk_server_callback(ctx, psk_cb);
+        wolfssl.CTX_set_verify(ctx, wolfssl.SSL_VERIFY_PEER, verify_cb);
 
         /* Set using custom IO callbacks
            delegate memory is allocated when calling SetIO**** function and freed with ctx free
@@ -235,7 +288,7 @@ class wolfSSL_Example_IOCallbacks
         if (wolfssl.set_fd(ssl, fd) != wolfssl.SUCCESS)
         {
             /* get and print out the error */
-            Console.Write(wolfssl.get_error(ssl));
+            Console.WriteLine(wolfssl.get_error(ssl));
             tcp.Stop();
             clean(ssl, ctx);
             return;
@@ -244,7 +297,7 @@ class wolfSSL_Example_IOCallbacks
         if (wolfssl.accept(ssl) != wolfssl.SUCCESS)
         {
             /* get and print out the error */
-            Console.Write(wolfssl.get_error(ssl));
+            Console.WriteLine(wolfssl.get_error(ssl));
             tcp.Stop();
             clean(ssl, ctx);
             return;

@@ -1,12 +1,12 @@
 /* devcrypto_hash.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,17 +19,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-
-#ifdef HAVE_CONFIG_H
-    #include <config.h>
-#endif
-
-#include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/wolfcrypt/libwolfssl_sources.h>
 
 #if defined(WOLFSSL_DEVCRYPTO_HASH)
 
-#include <wolfssl/wolfcrypt/error-crypt.h>
-#include <wolfssl/wolfcrypt/logging.h>
 #include <wolfssl/wolfcrypt/port/devcrypto/wc_devcrypto.h>
 
 #if !defined(NO_SHA256)
@@ -82,11 +75,12 @@ static int HashUpdate(void* ctx, int type, const byte* input, word32 inputSz)
     }
 
     if ((dev = GetHashContext(ctx, type)) == NULL) {
-        WOLFSSL_MSG("Unsuported hash type");
+        WOLFSSL_MSG("Unsupported hash type");
         return BAD_FUNC_ARG;
     }
 
-    wc_SetupCrypt(&crt, dev, (byte*)input, inputSz, NULL, digest, COP_FLAG_UPDATE);
+    wc_SetupCrypt(&crt, dev, (byte*)input, inputSz, NULL, digest,
+        COP_FLAG_UPDATE, COP_ENCRYPT);
     if (ioctl(dev->cfd, CIOCCRYPT, &crt)) {
         WOLFSSL_MSG("Error with call to ioctl");
         return WC_DEVCRYPTO_E;
@@ -103,11 +97,11 @@ static int GetDigest(void* ctx, int type, byte* out)
     struct crypt_op crt;
 
     if ((dev = GetHashContext(ctx, type)) == NULL) {
-        WOLFSSL_MSG("Unsuported hash type");
+        WOLFSSL_MSG("Unsupported hash type");
         return BAD_FUNC_ARG;
     }
 
-    wc_SetupCrypt(&crt, dev, NULL, 0, NULL, out, COP_FLAG_FINAL);
+    wc_SetupCrypt(&crt, dev, NULL, 0, NULL, out, COP_FLAG_FINAL, COP_ENCRYPT);
     if (ioctl(dev->cfd, CIOCCRYPT, &crt)) {
         WOLFSSL_MSG("Error with call to ioctl");
         return WC_DEVCRYPTO_E;

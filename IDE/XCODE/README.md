@@ -8,27 +8,27 @@ This directory contains the following files:
 4. `wolfssl-FIPS.xcodeproj` -- project to build wolfSSL and wolfCrypt-FIPS if available
 5. `user_settings.h` -- custom library settings, which are shared across projects
 
-The library will output as `libwolfssl_osx.a` or 'libwolfssl_ios.a` depending on 
-the target. It will also copy the wolfSSL/wolfCrypt (and the CyaSSL/CtaoCrypt 
-compatibility) headers into an `include` directory located in 
+The library will output as `libwolfssl_osx.a` or 'libwolfssl_ios.a` depending on
+the target. It will also copy the wolfSSL/wolfCrypt (and the CyaSSL/CtaoCrypt
+compatibility) headers into an `include` directory located in
 `Build/Products/Debug` or `Build/Products/Release`.
 
-For the library and testsuite to link properly the build location needs to be 
+For the library and testsuite to link properly the build location needs to be
 configured as realitive to workspace.
 1. File -> Workspace Settings (or Xcode -> Preferences -> Locations -> Locations)
 2. Derived Data -> Advanced
 3. Custom -> Relative to Workspace
 4. Products -> Build/Products
 
-These Xcode projects define the `WOLFSSL_USER_SETTINGS` preprocessor 
-to enable the `user_settings.h` file for setting macros across 
+These Xcode projects define the `WOLFSSL_USER_SETTINGS` preprocessor
+to enable the `user_settings.h` file for setting macros across
 multiple projects.
 
-If needed the Xcode preprocessors can be modifed with these steps:
+If needed the Xcode preprocessors can be modified with these steps:
 1. Click on the Project in "Project Navigator".
 2. Click on the "Build Settings" tab.
 3. Scroll down to the "Apple LLVM 6.0 - Preprocessing" section.
-4. Open the disclosure for "Preprocessor Macros" and use the "+" and 
+4. Open the disclosure for "Preprocessor Macros" and use the "+" and
 "-" buttons to modify. Remember to do this for both Debug and Release.
 
 ## wolfSSL
@@ -73,7 +73,7 @@ to the list of libraries to link against.
 Click on your project target, then the "Build Phases" tab. On the targets list
 click your target. Click the disclosure triangle on the section "Link Binary
 With Libraries" and verify libwolfssl.a is in the list. If not, click the "+",
-and on the "Choose framworks and libraries to add:" dialog, click the
+and on the "Choose frameworks and libraries to add:" dialog, click the
 button "Add other..." then find the file libwolfssl.a.
 
 Click on the "Build Settings" tab. Scroll down to the section "Search Paths".
@@ -91,8 +91,6 @@ When using the FIPS version the following preprocessors need to be defined:
 * `WOLFSSL_SHA512`
 * `WOLFSSL_SHA384`
 * `NO_MD4`
-* `NO_HC128`
-* `NO_RABBIT`
 * `NO_DSA`
 * `NO_PWDBASED`
 

@@ -1,12 +1,12 @@
 /* arc4.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,16 +19,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-
-#ifdef HAVE_CONFIG_H
-    #include <config.h>
-#endif
-
-#include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/wolfcrypt/libwolfssl_sources.h>
 
 #ifndef NO_RC4
 
-#include <wolfssl/wolfcrypt/error-crypt.h>
 #include <wolfssl/wolfcrypt/arc4.h>
 
 
@@ -38,7 +32,7 @@ int wc_Arc4SetKey(Arc4* arc4, const byte* key, word32 length)
     word32 i;
     word32 keyIndex = 0, stateIndex = 0;
 
-    if (arc4 == NULL || key == NULL) {
+    if (arc4 == NULL || key == NULL || length == 0) {
         return BAD_FUNC_ARG;
     }
 

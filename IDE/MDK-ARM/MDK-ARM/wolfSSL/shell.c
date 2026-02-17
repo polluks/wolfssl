@@ -1,12 +1,12 @@
 /*shell.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -145,14 +145,6 @@ extern void hmac_sha384_test(void *arg) ;
 extern void arc4_test(void *arg) ;
 #endif
 
-#ifndef NO_HC128
-extern void hc128_test(void *arg) ;
-#endif
-
-#ifndef NO_RABBIT
-extern void rabbit_test(void *arg) ;
-#endif
-
 #ifndef NO_DES3
 extern void des_test(void *arg) ;
 extern void des3_test(void *arg) ;
@@ -214,7 +206,7 @@ static struct {
     "stack", stack_comm,        /* On/Off check stack size */
     "for", for_command,         /* iterate next command X times */
     "debug", dbg_comm,          /* On/Off debug message  */
-    "help", help_comm,          /* Breif description about the commands */
+    "help", help_comm,          /* Brief description about the commands */
 
     /** short name **/
     "ec", echoclient_test,
@@ -267,12 +259,6 @@ static struct {
 #ifndef NO_RC4
     "arc4",  arc4_test,
 #endif
-#ifndef NO_HC128
-  "hc128",  hc128_test,
-#endif
-#ifndef NO_RABBIT
-  "rabbit",  rabbit_test,
-#endif
 #ifndef NO_DES3
   "des",  des_test,
   "des3",  des3_test,
@@ -315,7 +301,7 @@ static struct {
     "",  NULL
 } ;
 
-enum jobtype { FORGROUND, BACKGROUND }  ;
+enum jobtype { FOREGROUND, BACKGROUND }  ;
 
 #define IF_DELIMITER(ch) ((ch) == ' ' || (ch) == '\n')
 
@@ -340,7 +326,7 @@ static int getline(char * line, int sz, func_args *args, int*bf_flg)
         (*bf_flg) = BACKGROUND ;
         line[strlen(line)-2] = '\n' ;
     } else {
-        (*bf_flg) = FORGROUND ;
+        (*bf_flg) = FOREGROUND ;
     }
     args->argc = 0 ;
     for(i=0; i<sz; i++) {
@@ -436,7 +422,7 @@ static void for_command(void *args)
 {
     if( args == NULL || ((func_args *)args)->argc == 1) {
         printf("For %d times\n", for_iteration) ;
-    } else if( args == NULL || ((func_args *)args)->argc == 2) {
+    } else if(((func_args *)args)->argc == 2) {
         for_iteration = atoi(((func_args *)args)->argv[1]) ;
     } else printf("Invalid argument\n") ;
 }
@@ -483,7 +469,7 @@ static char command_stack[COMMAND_STACK_SIZE] ;
 static   wolfSSL_Mutex command_mutex ;
 #endif
 
-/***********    Invoke Forground Command  *********************/
+/***********    Invoke Foreground Command  *********************/
 static void command_invoke(void *args)
 {
     void (*func)(void * ) ;
@@ -556,7 +542,7 @@ void shell_main(void) {
         for(i=0; commandTable[i].func != NULL; i++) {
             if(strcmp(commandTable[i].command, args.argv[0]) == 0) {
             args.argv[0] = (char *) commandTable[i].func ;
-                if(bf_flg == FORGROUND) {
+                if(bf_flg == FOREGROUND) {
                     #ifdef  HAVE_KEIL_RTX
                     wc_UnLockMutex((wolfSSL_Mutex *)&command_mutex) ;
                     os_tsk_create_user_ex( (void(*)(void *))&command_invoke, 7,

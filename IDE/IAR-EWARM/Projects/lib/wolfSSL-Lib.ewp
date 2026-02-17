@@ -343,7 +343,7 @@
         </option>
         <option>
           <name>CCPosIndRopi</name>
-          <state>0</state>
+          <state>1</state>
         </option>
         <option>
           <name>CCPosIndRwpi</name>
@@ -1593,7 +1593,7 @@
         </option>
         <option>
           <name>IlinkOutputFile</name>
-          <state>###Unitialized###</state>
+          <state>###Uninitialized###</state>
         </option>
         <option>
           <name>IlinkDebugInfoEnable</name>
@@ -1879,7 +1879,7 @@
         </option>
         <option>
           <name>IarchiveOutput</name>
-          <state>###Unitialized###</state>
+          <state>###Uninitialized###</state>
         </option>
       </data>
     </settings>
@@ -1976,13 +1976,10 @@
       <name>$PROJ_DIR$\..\..\..\..\wolfcrypt\src\hash.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\..\..\..\wolfcrypt\src\hc128.c</name>
+      <name>$PROJ_DIR$\..\..\..\..\wolfcrypt\src\kdf.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\..\..\wolfcrypt\src\hmac.c</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\..\..\..\wolfcrypt\src\idea.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\..\..\wolfcrypt\src\integer.c</name>
@@ -2013,9 +2010,6 @@
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\..\..\wolfcrypt\src\pwdbased.c</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\..\..\..\wolfcrypt\src\rabbit.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\..\..\wolfcrypt\src\random.c</name>

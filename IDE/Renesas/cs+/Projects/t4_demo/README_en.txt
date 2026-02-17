@@ -12,7 +12,7 @@ Setup process:
   - Unzip wolfssl under the same directory
  
 2. Set up wolfSSL
-  - open wolfssl\IDE\Renesas\cs+\Projec/wolfssl\lib.mtpj with CS+ and build
+  - open wolfssl\IDE\Renesas\cs+\Projects\wolfssl\lib.mtpj with CS+ and build
   - open t4_demo.mtpj and build. This create demo program library.
 
 3. Set up AlphaProject
@@ -71,7 +71,7 @@ wolfssl\IDE\Renesas\cs+\Projects\t4_demo\DefaultBuild\t4_demo.lib
 
    - Set CC-RX(Build Tool)->Library Geberation->Library Configuration to"C99" and enable ctype.h.
 
-   - Build the project and start execut. You see message on the console prompting command.
+   - Build the project and start execute. You see message on the console prompting command.
    
 ===
 wolfSSL Demo

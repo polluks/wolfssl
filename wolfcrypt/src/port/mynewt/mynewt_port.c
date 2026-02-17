@@ -1,12 +1,12 @@
 /* mynewt_port.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,8 +19,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-#if defined(WOLFSSL_APACHE_MYNEWT)
+#ifdef HAVE_CONFIG_H
+    #include <config.h>
+#endif
+
+#ifdef WOLFSSL_APACHE_MYNEWT
+
 #ifndef NO_FILESYSTEM
+
 #include "fs/fs.h"
 #define FILE struct fs_file
 
@@ -128,7 +134,6 @@ size_t mynewt_fread(void *restrict ptr, size_t size, size_t nitems, FILE *restri
 size_t mynewt_fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stream)
 {
     size_t to_write = size * nitems;
-    size_t write_size;
     int rc = fs_write(stream, ptr, to_write);
     if(rc != 0) {
         return 0;
@@ -143,5 +148,5 @@ int mynewt_fclose(FILE *stream)
     return 0;
 }
 
-#endif /* NO_FILESYSTEM*/
-#endif /* if defined(WOLFSSL_APACHE_MYNEWT) */
+#endif /* !NO_FILESYSTEM */
+#endif /* WOLFSSL_APACHE_MYNEWT */

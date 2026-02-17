@@ -1,12 +1,12 @@
 /* caam_sha.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,6 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#ifdef HAVE_CONFIG_H
+    #include <config.h>
+#endif
 
 #include <wolfssl/wolfcrypt/settings.h>
 
@@ -35,7 +38,9 @@
 #endif
 
 
+#if defined(__INTEGRITY) || defined(INTEGRITY)
 #include <INTEGRITY.h>
+#endif
 #include <wolfssl/wolfcrypt/port/caam/caam_driver.h>
 #include <wolfssl/wolfcrypt/port/caam/wolfcaam.h>
 
@@ -393,5 +398,4 @@ int wc_Sha512Final(wc_Sha512* sha, byte* out)
 }
 #endif /* WOLFSSL_SHA512 */
 
-#endif /* WOLFSSL_IMX6_CAAM */
-
+#endif /* WOLFSSL_IMX6_CAAM && !NO_IMX6_CAAM_HASH */

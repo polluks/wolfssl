@@ -1,12 +1,12 @@
 /* afalg_hash.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,18 +19,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-
-#ifdef HAVE_CONFIG_H
-    #include <config.h>
-#endif
-
-#include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/wolfcrypt/libwolfssl_sources.h>
 
 #if defined(WOLFSSL_AFALG_HASH) || (defined(WOLFSSL_AFALG_XILINX_SHA3) \
         && defined(WOLFSSL_SHA3))
 
-#include <wolfssl/wolfcrypt/error-crypt.h>
-#include <wolfssl/wolfcrypt/logging.h>
 #include <wolfssl/wolfcrypt/port/af_alg/wc_afalg.h>
 #include <wolfssl/wolfcrypt/port/af_alg/afalg_hash.h>
 
@@ -44,19 +37,17 @@ static void AfalgHashFree(wolfssl_AFALG_Hash* hash)
         return;
 
     if (hash->alFd > 0) {
-        close(hash->alFd);
+        (void)close(hash->alFd);
         hash->alFd = -1; /* avoid possible double close on socket */
     }
     if (hash->rdFd > 0) {
-        close(hash->rdFd);
+        (void)close(hash->rdFd);
         hash->rdFd = -1; /* avoid possible double close on socket */
     }
 
     #if defined(WOLFSSL_AFALG_HASH_KEEP)
-    if (hash->msg != NULL) {
-        XFREE(hash->msg, hash->heap, DYNAMIC_TYPE_TMP_BUFFER);
-        hash->msg = NULL;
-    }
+    XFREE(hash->msg, hash->heap, DYNAMIC_TYPE_TMP_BUFFER);
+    hash->msg = NULL;
     #endif
 }
 
@@ -86,7 +77,7 @@ static int AfalgHashInit(wolfssl_AFALG_Hash* hash, void* heap, int devId,
 
     hash->rdFd = wc_Afalg_CreateRead(hash->alFd, WC_TYPE_HASH, type);
     if (hash->rdFd < 0) {
-        close(hash->alFd);
+        (void)close(hash->alFd);
         return WC_AFALG_SOCK_E;
     }
 
@@ -113,7 +104,7 @@ static int AfalgHashUpdate(wolfssl_AFALG_Hash* hash, const byte* in, word32 sz)
                     DYNAMIC_TYPE_TMP_BUFFER);
             if (pt == NULL) {
                 return MEMORY_E;
-	    }
+            }
             hash->msg = pt;
         }
         if (hash->msg == NULL) {
@@ -121,8 +112,10 @@ static int AfalgHashUpdate(wolfssl_AFALG_Hash* hash, const byte* in, word32 sz)
         }
         hash->len = hash->used + sz;
     }
-    XMEMCPY(hash->msg + hash->used, in, sz);
-    hash->used += sz;
+    if (sz > 0) {
+        XMEMCPY(hash->msg + hash->used, in, sz);
+        hash->used += sz;
+    }
 #else
     int ret;
 
@@ -139,32 +132,41 @@ static int AfalgHashFinal(wolfssl_AFALG_Hash* hash, byte* out, word32 outSz,
         const char* type)
 {
     int   ret;
-    void* heap;
 
     if (hash == NULL || out == NULL) {
         return BAD_FUNC_ARG;
     }
 
-    heap = hash->heap; /* keep because AfalgHashInit clears the pointer */
 #ifdef WOLFSSL_AFALG_HASH_KEEP
     /* keep full message to out at end instead of incremental updates */
     if ((ret = (int)send(hash->rdFd, hash->msg, hash->used, 0)) < 0) {
-        return ret;
+        ret = WC_AFALG_SOCK_E;
+        goto out;
     }
-    XFREE(hash->msg, heap, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(hash->msg, hash->heap, DYNAMIC_TYPE_TMP_BUFFER);
     hash->msg = NULL;
 #else
     if ((ret = (int)send(hash->rdFd, NULL, 0, 0)) < 0) {
-        return ret;
+        ret = WC_AFALG_SOCK_E;
+        goto out;
     }
 #endif
 
     if ((ret = (int)read(hash->rdFd, out, outSz)) != (int)outSz) {
-        return ret;
+        ret = WC_AFALG_SOCK_E;
+        goto out;
     }
 
+    ret = 0;
+
+out:
+
     AfalgHashFree(hash);
-    return AfalgHashInit(hash, heap, 0, type);
+
+    if (ret != 0)
+        return ret;
+    else
+        return AfalgHashInit(hash, hash->heap, 0, type);
 }
 
 
@@ -212,7 +214,8 @@ static int AfalgHashCopy(wolfssl_AFALG_Hash* src, wolfssl_AFALG_Hash* dst)
     if (dst->msg == NULL) {
         return MEMORY_E;
     }
-    XMEMCPY(dst->msg, src->msg, src->len);
+    if (src->len > 0)
+        XMEMCPY(dst->msg, src->msg, src->len);
 #endif
 
     dst->rdFd = accept(src->rdFd, NULL, 0);

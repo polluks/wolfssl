@@ -1,12 +1,12 @@
 /* ripemd.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,13 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-
-
-#ifdef HAVE_CONFIG_H
-    #include <config.h>
-#endif
-
-#include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/wolfcrypt/libwolfssl_sources.h>
 
 #ifdef WOLFSSL_RIPEMD
 
@@ -36,8 +30,6 @@
     #define WOLFSSL_MISC_INCLUDED
     #include <wolfcrypt/src/misc.c>
 #endif
-
-#include <wolfssl/wolfcrypt/error-crypt.h>
 
 int wc_InitRipeMd(RipeMd* ripemd)
 {
@@ -60,11 +52,11 @@ int wc_InitRipeMd(RipeMd* ripemd)
 
 
 /* for all */
-#define F(x, y, z)    (x ^ y ^ z)
-#define G(x, y, z)    (z ^ (x & (y^z)))
-#define H(x, y, z)    (z ^ (x | ~y))
-#define I(x, y, z)    (y ^ (z & (x^y)))
-#define J(x, y, z)    (x ^ (y | ~z))
+#define F(x, y, z)    ((x) ^ (y) ^ (z))
+#define G(x, y, z)    ((z) ^ ((x) & ((y)^(z))))
+#define H(x, y, z)    ((z) ^ ((x) | ~(y)))
+#define I(x, y, z)    ((y) ^ ((z) & ((x)^(y))))
+#define J(x, y, z)    ((x) ^ ((y) | ~(z)))
 
 #define k0 0
 #define k1 0x5a827999
@@ -79,9 +71,9 @@ int wc_InitRipeMd(RipeMd* ripemd)
 
 /* for 160 and 320 */
 #define Subround(f, a, b, c, d, e, x, s, k) \
-    a += f(b, c, d) + x + k;\
-    a = rotlFixed((word32)a, s) + e;\
-    c = rotlFixed((word32)c, 10U)
+    a += f(b, c, d) + (x) + (k);            \
+    (a) = rotlFixed((word32)(a), s) + (e);  \
+    (c) = rotlFixed((word32)(c), 10U)
 
 static void Transform(RipeMd* ripemd)
 {
@@ -323,6 +315,12 @@ int wc_RipeMdFinal(RipeMd* ripemd, byte* hash)
     local = (byte*)ripemd->buffer;
 
     AddLength(ripemd, ripemd->buffLen);               /* before adding pads */
+
+    /* ensure we have a valid buffer length; */
+    if (ripemd->buffLen > RIPEMD_BLOCK_SIZE) {
+        /* exit with error code if there's a bad buffer size in buffLen */
+        return BAD_STATE_E;
+    } /* buffLen check */
 
     local[ripemd->buffLen++] = 0x80;  /* add 1 */
 

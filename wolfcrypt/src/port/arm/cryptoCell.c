@@ -1,12 +1,12 @@
 /* cryptoCell.c
  *
- * Copyright (C) 2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,11 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-#ifdef HAVE_CONFIG_H
-    #include <config.h>
-#endif
-
-#include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/wolfcrypt/libwolfssl_sources.h>
 
 /* This source is included in wc_port.c */
 /* WOLFSSL_CRYPTOCELL_C is defined by wc_port.c in case compile tries to
@@ -32,8 +28,6 @@
 
 #ifdef WOLFSSL_CRYPTOCELL
 
-#include <wolfssl/wolfcrypt/error-crypt.h>
-#include <wolfssl/wolfcrypt/logging.h>
 #include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/port/arm/cryptoCell.h>
 
@@ -146,34 +140,37 @@ CRYS_ECPKI_DomainID_t cc310_mapCurve(int curve_id)
 #endif /* HAVE_ECC */
 
 #ifndef NO_RSA
-CRYS_RSA_HASH_OpMode_t cc310_hashModeRSA(enum wc_HashType hash_type)
+CRYS_RSA_HASH_OpMode_t cc310_hashModeRSA(enum wc_HashType hash_type, int isHashed)
 {
     switch(hash_type)
     {
         case WC_HASH_TYPE_MD5:
         #ifndef NO_MD5
-            return CRYS_RSA_HASH_MD5_mode;
+            return isHashed? CRYS_RSA_After_MD5_mode : CRYS_RSA_HASH_MD5_mode;
         #endif
         case WC_HASH_TYPE_SHA:
         #ifndef NO_SHA
-            return CRYS_RSA_HASH_SHA1_mode;
+            return isHashed? CRYS_RSA_After_SHA1_mode : CRYS_RSA_HASH_SHA1_mode;
         #endif
         case WC_HASH_TYPE_SHA224:
         #ifdef WOLFSSL_SHA224
-            return CRYS_RSA_HASH_SHA224_mode;
+            return isHashed? CRYS_RSA_After_SHA224_mode : CRYS_RSA_HASH_SHA224_mode;
         #endif
         case WC_HASH_TYPE_SHA256:
         #ifndef NO_SHA256
-            return CRYS_RSA_HASH_SHA256_mode;
+            return isHashed? CRYS_RSA_After_SHA256_mode : CRYS_RSA_HASH_SHA256_mode;
         #endif
         case WC_HASH_TYPE_SHA384:
         #ifdef WOLFSSL_SHA384
-            return CRYS_RSA_HASH_SHA384_mode;
+            return isHashed? CRYS_RSA_After_SHA384_mode : CRYS_RSA_HASH_SHA384_mode;
         #endif
         case WC_HASH_TYPE_SHA512:
         #ifdef WOLFSSL_SHA512
-            return CRYS_RSA_HASH_SHA512_mode;
+            return isHashed? CRYS_RSA_After_SHA512_mode : CRYS_RSA_HASH_SHA512_mode;
         #endif
+        case WC_HASH_TYPE_NONE:
+            /* default to SHA256 */
+            return isHashed? CRYS_RSA_After_SHA256_mode : CRYS_RSA_HASH_SHA256_mode;
         default:
             return CRYS_RSA_After_HASH_NOT_KNOWN_mode;
     }

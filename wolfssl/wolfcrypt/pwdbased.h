@@ -1,12 +1,12 @@
 /* pwdbased.h
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -35,23 +35,30 @@
     extern "C" {
 #endif
 
+#if FIPS_VERSION3_GE(6,0,0)
+    extern const unsigned int wolfCrypt_FIPS_pbkdf_ro_sanity[2];
+    WOLFSSL_LOCAL int wolfCrypt_FIPS_PBKDF_sanity(void);
+#endif
 /*
  * hashType renamed to typeH to avoid shadowing global declaration here:
  * wolfssl/wolfcrypt/asn.h line 173 in enum Oid_Types
  */
 WOLFSSL_API int wc_PBKDF1_ex(byte* key, int keyLen, byte* iv, int ivLen,
-                      const byte* passwd, int passwdLen, 
-                      const byte* salt, int saltLen, int iterations, 
+                      const byte* passwd, int passwdLen,
+                      const byte* salt, int saltLen, int iterations,
                       int hashType, void* heap);
 WOLFSSL_API int wc_PBKDF1(byte* output, const byte* passwd, int pLen,
                       const byte* salt, int sLen, int iterations, int kLen,
-                      int typeH);
+                      int hashType);
+WOLFSSL_API int wc_PBKDF2_ex(byte* output, const byte* passwd, int pLen,
+                    const byte* salt, int sLen, int iterations, int kLen,
+                    int hashType, void* heap, int devId);
 WOLFSSL_API int wc_PBKDF2(byte* output, const byte* passwd, int pLen,
                       const byte* salt, int sLen, int iterations, int kLen,
-                      int typeH);
-WOLFSSL_API int wc_PKCS12_PBKDF(byte* output, const byte* passwd, int pLen,
-                            const byte* salt, int sLen, int iterations,
-                            int kLen, int typeH, int purpose);
+                      int hashType);
+WOLFSSL_API int wc_PKCS12_PBKDF(byte* output, const byte* passwd, int passLen,
+                            const byte* salt, int saltLen, int iterations,
+                            int kLen, int hashType, int id);
 WOLFSSL_API int wc_PKCS12_PBKDF_ex(byte* output, const byte* passwd,int passLen,
                        const byte* salt, int saltLen, int iterations, int kLen,
                        int hashType, int id, void* heap);
@@ -60,6 +67,9 @@ WOLFSSL_API int wc_PKCS12_PBKDF_ex(byte* output, const byte* passwd,int passLen,
 WOLFSSL_API int wc_scrypt(byte* output, const byte* passwd, int passLen,
                           const byte* salt, int saltLen, int cost,
                           int blockSize, int parallel, int dkLen);
+WOLFSSL_API int wc_scrypt_ex(byte* output, const byte* passwd, int passLen,
+                             const byte* salt, int saltLen, word32 iterations,
+                             int blockSize, int parallel, int dkLen);
 #endif
 
 

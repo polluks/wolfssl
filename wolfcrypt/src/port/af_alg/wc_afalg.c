@@ -1,12 +1,12 @@
 /* wc_afalg.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -19,13 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-#ifdef HAVE_CONFIG_H
-    #include <config.h>
-#endif
-
-#include <wolfssl/wolfcrypt/settings.h>
-#include <wolfssl/wolfcrypt/error-crypt.h>
-#include <wolfssl/wolfcrypt/logging.h>
+#include <wolfssl/wolfcrypt/libwolfssl_sources.h>
 
 #if defined(WOLFSSL_AFALG) || defined(WOLFSSL_AFALG_XILINX)
 
@@ -36,11 +30,20 @@
 /* Sets the type of socket address to use */
 void wc_Afalg_SockAddr(struct sockaddr_alg* in, const char* type, const char* name)
 {
+    int typeSz = (int)XSTRLEN(type) + 1; /* +1 for null terminator */
+    int nameSz = (int)XSTRLEN(name) + 1; /* +1 for null terminator */
+
+    if (typeSz > (int)sizeof(in->salg_type) ||
+                    nameSz > (int)sizeof(in->salg_name)) {
+        WOLFSSL_MSG("type or name was too large");
+        return;
+    }
+
     in->salg_family = AF_ALG;
-    XSTRNCPY((char*)in->salg_type, type, XSTRLEN(type));
-    in->salg_type[XSTRLEN(type)] = '\0';
-    XSTRNCPY((char*)in->salg_name, name, XSTRLEN(name));
-    in->salg_name[XSTRLEN(name)] = '\0';
+    XSTRNCPY((char*)in->salg_type, type, typeSz);
+    in->salg_type[typeSz - 1] = '\0';
+    XSTRNCPY((char*)in->salg_name, name, nameSz);
+    in->salg_name[nameSz - 1] = '\0';
 }
 
 

@@ -1,12 +1,12 @@
 /* port/ti/ti-des.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -26,7 +26,7 @@
 
 #include <wolfssl/wolfcrypt/settings.h>
 
-#ifndef NO_DES
+#ifndef NO_DES3
 
 #if defined(WOLFSSL_TI_CRYPT)
 #include <stdbool.h>
@@ -201,4 +201,4 @@ WOLFSSL_API void wc_Des3Free(Des3* des)
 
 #endif /* WOLFSSL_TI_CRYPT */
 
-#endif /* NO_DES */
+#endif /* !NO_DES3 */

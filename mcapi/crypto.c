@@ -1,12 +1,12 @@
 /* crypto.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -24,14 +24,17 @@
 #ifdef HAVE_CONFIG_H
     #include "config.h"
 #endif
+#ifndef WOLFSSL_USER_SETTINGS
+    #include <wolfssl/options.h>
+#endif
+#include <wolfssl/wolfcrypt/settings.h>
+
 #ifdef MICROCHIP_MPLAB_HARMONY
     #include "system_config.h"
     #include "crypto/crypto.h"
 #else
     #include "crypto.h"
 #endif
-
-#include <wolfssl/wolfcrypt/settings.h>
 
 #include <wolfssl/wolfcrypt/md5.h>
 #include <wolfssl/wolfcrypt/sha.h>
@@ -702,13 +705,31 @@ int CRYPT_ECC_DHE_SharedSecretMake(CRYPT_ECC_CTX* priv, CRYPT_ECC_CTX* pub,
 {
     int ret;
     unsigned int inOut = outSz;
+#if defined(ECC_TIMING_RESISTANT)
+    WC_RNG rng;
+#endif
 
     if (priv == NULL || pub == NULL || out == NULL || usedSz == NULL)
         return BAD_FUNC_ARG;
 
+#if defined(ECC_TIMING_RESISTANT)
+    ret = wc_InitRng(&rng);
+    if (ret != 0)
+        return ret;
+    ret = wc_ecc_set_rng((ecc_key*)priv->holder, &rng);
+    if (ret != 0) {
+        wc_FreeRng(&rng);
+        return ret;
+    }
+#endif
+
     ret = wc_ecc_shared_secret((ecc_key*)priv->holder, (ecc_key*)pub->holder,
                             out, &inOut);
     *usedSz = inOut;
+
+#if defined(ECC_TIMING_RESISTANT)
+    wc_FreeRng(&rng);
+#endif
 
     return ret;
 }

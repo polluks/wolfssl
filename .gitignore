@@ -3,20 +3,23 @@ ctaocrypt/src/src/
 *.lo
 *.la
 *.o
-*.patch
 *.deps
+*.d
 *.libs
 *.cache
 .dirstamp
 *.user
+!*-VS2022.vcxproj.user
 configure
 config.*
+!cmake/config.in
 *Debug/
 *Release/
 *.ncb
 *.suo
 *.sdf
 *.opensdf
+*.cmd
 ipch/
 build-aux/
 rpm/spec
@@ -24,12 +27,13 @@ rpm/spec
 stamp-h
 cyassl/options.h
 wolfssl/options.h
+.build_params
 libtool.m4
 aclocal.m4
 aminclude.am
 lt*.m4
 Makefile.in
-Makefile
+/Makefile
 depcomp
 missing
 libtool
@@ -37,6 +41,9 @@ tags
 .tags*
 cyassl-config
 wolfssl-config
+cmake/wolfssl-config.cmake
+cmake/wolfssl-config-version.cmake
+cmake/wolfssl-targets.cmake
 cyassl.sublime*
 fips.h
 fips.c
@@ -46,20 +53,12 @@ wolfcrypt_first.c
 wolfcrypt_last.c
 selftest.c
 fipsv2.c
-src/async.c
-wolfssl/async.h
-wolfcrypt/src/async.c
-wolfssl/wolfcrypt/async.h
-wolfcrypt/src/port/intel/quickassist.c
-wolfcrypt/src/port/intel/quickassist_mem.c
-wolfcrypt/src/port/cavium/cavium_nitrox.c
-wolfssl/wolfcrypt/port/intel/quickassist.h
-wolfssl/wolfcrypt/port/intel/quickassist_mem.h
-wolfssl/wolfcrypt/port/cavium/cavium_nitrox.h
 ctaocrypt/benchmark/benchmark
 ctaocrypt/test/testctaocrypt
 wolfcrypt/benchmark/benchmark
 wolfcrypt/test/testwolfcrypt
+examples/async/async_client
+examples/async/async_server
 examples/benchmark/tls_bench
 examples/client/client
 examples/echoclient/echoclient
@@ -69,19 +68,26 @@ examples/sctp/sctp-server
 examples/sctp/sctp-server-dtls
 examples/sctp/sctp-client
 examples/sctp/sctp-client-dtls
+examples/asn1/asn1
+examples/pem/pem
 server_ready
 snifftest
 output
 mcapi/test
 testsuite/testsuite
-tests/unit
 testsuite/testsuite.test
-tests/unit.test
-tests/bio_write_test.txt
-test-write-dhparams.pem
 testsuite/*.der
 testsuite/*.pem
 testsuite/*.raw
+testsuite/*.obj
+testsuite/*.pdb
+testsuite/*.idb
+tests/unit
+tests/unit.test
+tests/bio_write_test.txt
+tests/test-log-dump-to-file.txt
+tests/cert_cache.tmp
+test-write-dhparams.pem
 cert.der
 cert.pem
 certecc.der
@@ -101,6 +107,10 @@ ecc-key.der
 ecc-key.pem
 certreq.der
 certreq.pem
+crlRsaOut.pem
+crlRsaOut.der
+crlEccOut.pem
+crlEccOut.der
 pkcs7cert.der
 pkcs7authEnvelopedDataAES128GCM.der
 pkcs7authEnvelopedDataAES128GCM_ECDH_SHA1KDF.der
@@ -203,14 +213,6 @@ TAGS
 support/cyassl.pc
 support/wolfssl.pc
 cyassl/ctaocrypt/stamp-h1
-swig/_cyassl.so
-swig/_wolfssl.so
-swig/cyassl.py
-swig/wolfssl.py
-swig/cyassl.pyc
-swig/wolfssl.pyc
-swig/cyassl_wrap.c
-swig/wolfssl_wrap.c
 stamp-h1
 clang_output_*
 internal.plist
@@ -226,6 +228,39 @@ IDE/MDK-ARM/LPC43xx/LPC43xx/
 *.gcno
 *.gcda
 *.gcov
+*.dgcov
+!linuxkm/Makefile
+/Kbuild
+linuxkm/*.ko
+linuxkm/*.ko.signed
+linuxkm/Module.symvers
+linuxkm/built-in.a
+linuxkm/modules.order
+linuxkm/wolfcrypt
+linuxkm/libwolfssl.mod
+linuxkm/libwolfssl.mod.c
+linuxkm/libwolfssl.lds
+linuxkm/module_exports.c
+linuxkm/linuxkm/get_thread_size
+linuxkm/linuxkm
+linuxkm/src
+linuxkm/patches/src
+*.nds
+
+# Generated during FreeBSD kernel module build.
+bsdkm/export_syms
+bsdkm/i386
+bsdkm/libwolfssl.ko
+bsdkm/machine
+bsdkm/opt_global.h
+bsdkm/x86
+bsdkm/bus_if.h
+bsdkm/cryptodev_if.h
+bsdkm/device_if.h
+
+# autotools generated
+scripts/unit.test
+wolfcrypt/test/test_paths.h
 
 # MPLAB Generated Files (OS X)
 mcapi/wolfcrypt_mcapi.X/nbproject/Makefile-*
@@ -266,23 +301,6 @@ mqx/wolfcrypt_benchmark/.settings
 mqx/wolfcrypt_benchmark/.cwGeneratedFileSetLog
 mqx/wolfcrypt_benchmark/SaAnalysispointsManager.apconfig
 
-# User Crypto example build
-wolfcrypt/user-crypto/aclocal.m4
-wolfcrypt/user-crypto/config.guess
-wolfcrypt/user-crypto/autom4te.cache
-wolfcrypt/user-crypto/config.log
-wolfcrypt/user-crypto/config.status
-wolfcrypt/user-crypto/config.sub
-wolfcrypt/user-crypto/depcomp
-wolfcrypt/user-crypto/install-sh
-wolfcrypt/user-crypto/libtool
-wolfcrypt/user-crypto/ltmain.sh
-wolfcrypt/user-crypto/m4
-wolfcrypt/user-crypto/missing
-wolfcrypt/user-crypto/Makefile.in
-wolfcrypt/user-crypto/lib/libusercrypto.*
-*.hzs
-
 # wolfSSL CSharp wrapper
 wrapper/CSharp/x64/
 
@@ -307,6 +325,10 @@ IDE/HEXIWEAR/wolfSSL_HW/Debug
 # Linux-SGX
 IDE/LINUX-SGX/*.a
 
+IDE/iotsafe/*.map
+IDE/iotsafe/*.elf
+IDE/iotsafe/*.bin
+
 # Binaries
 wolfcrypt/src/port/intel/qat_test
 /mplabx/wolfssl.X/dist/default/
@@ -315,6 +337,10 @@ wolfcrypt/src/port/intel/qat_test
 # Arduino Generated Files
 /IDE/ARDUINO/wolfSSL
 scripts/memtest.txt
+/IDE/ARDUINO/Arduino_README_prepend.md.tmp
+/IDE/ARDUINO/library.properties.tmp
+/IDE/ARDUINO/library.properties.tmp.backup
+/IDE/ARDUINO/PREPENDED_README.md
 
 # Doxygen generated files
 doc/doxygen_warnings
@@ -323,14 +349,140 @@ doc/pdf
 
 # XCODE Index
 IDE/XCODE/Index
+IDE/**/xcshareddata
+IDE/**/DerivedData
 
-# ARM DS-5
+# ARM DS-5 && Eclipse
 \.settings/
 \.cproject
 \.project
+\.autotools
 
 # Renesas e2studio
 /IDE/Renesas/e2studio/Projects/test/src/smc_gen
 /IDE/Renesas/e2studio/Projects/test/trash
 /IDE/Renesas/e2studio/Projects/test/*.launch
 /IDE/Renesas/e2studio/Projects/test/*.scfg
+
+/IDE/Renesas/e2studio/RX65N/GR-ROSE/.metadata
+/IDE/Renesas/e2studio/RX65N/GR-ROSE/smc/src
+/IDE/Renesas/e2studio/RX65N/GR-ROSE/smc/trash
+/IDE/Renesas/e2studio/RX65N/GR-ROSE/test/src/smc_gen
+/IDE/Renesas/e2studio/RX65N/GR-ROSE/test/generate
+
+/IDE/Renesas/e2studio/RX65N/RSK/.metadata
+/IDE/Renesas/e2studio/RX65N/RSK/smc/src
+/IDE/Renesas/e2studio/RX65N/RSK/smc/trash
+/IDE/Renesas/e2studio/RX65N/RSK/test/src/smc_gen
+/IDE/Renesas/e2studio/RX65N/RSK/test/generate
+
+/IDE/Renesas/e2studio/RX72N/EnvisionKit/.metadata
+/IDE/Renesas/e2studio/RX72N/EnvisionKit/smc/src
+/IDE/Renesas/e2studio/RX72N/EnvisionKit/smc/trash
+/IDE/Renesas/e2studio/RX72N/EnvisionKit/test/src/smc_gen
+/IDE/Renesas/e2studio/RX72N/EnvisionKit/test/generate
+
+# QNX CAAM
+/IDE/QNX/example-server/server-tls
+/IDE/QNX/example-client/client-tls
+/IDE/QNX/example-cmac/cmac-test
+/IDE/QNX/CAAM-DRIVER/wolfCrypt
+
+# Xilinx
+/IDE/XilinxSDK/data
+
+# Emacs
+*~
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+!cmake/Config.cmake.in
+
+# GDB Settings
+\.gdbinit
+
+libFuzzer
+
+# Pycharm and other IDEs
+\.idea
+
+# FIPS
+XXX-fips-test
+
+# ASYNC
+/wolfAsyncCrypt
+/async
+
+# Generated user_settings_asm.h.
+user_settings_asm.h
+
+# VisualGDB
+**/.visualgdb
+
+# Espressif sdk config default should be saved in sdkconfig.defaults
+# we won't track the actual working sdkconfig files
+/IDE/Espressif/**/sdkconfig
+/IDE/Espressif/**/sdkconfig.old
+
+# ESP8266 RTOS SDK has a slightly different sdkconfig filename to exclude:
+/IDE/Espressif/**/sdkconfig.debug
+/IDE/Espressif/**/sdkconfig.release
+/IDE/Espressif/**/sdkconfig-debug
+/IDE/Espressif/**/sdkconfig-release
+
+# Always include Espressif makefiles (typically only used for ESP8266)
+!/IDE/Espressif/**/Makefile
+!/IDE/Espressif/**/component.mk
+
+# Ignore all the example logs
+/IDE/Espressif/ESP-IDF/examples/**/logs/*
+
+# MPLAB
+/IDE/MPLABX16/wolfssl.X/dist/default/
+/IDE/MPLABX16/wolfssl.X/.generated_files
+/IDE/MPLABX16/wolfcrypt_test.X/dist/default/
+/IDE/MPLABX16/wolfcrypt_test.X/.generated_files
+
+# auto-created CMake backups
+**/CMakeLists.txt.old
+
+# MagicCrypto (ARIA Cipher)
+MagicCrypto
+
+# CMake  build directory
+/out
+/out_temp
+
+# debian packaging
+debian/changelog
+debian/control
+debian/rules
+*.deb
+
+# Ada/Alire files
+wrapper/Ada/alire/
+wrapper/Ada/config/
+wrapper/Ada/lib/
+wrapper/Ada/obj/
+
+# Rust wrapper files
+/wrapper/rust/*/target/
+
+# PlatformIO
+/**/.pio
+/**/.vscode/.browse.c_cpp.db*
+/**/.vscode/c_cpp_properties.json
+/**/.vscode/launch.json
+/**/.vscode/ipch
+/**/sdkconfig.esp32dev
+
+# Autogenerated debug trace headers
+wolfssl/debug-trace-error-codes.h
+wolfssl/debug-untrace-error-codes.h
+
+AGENTS.md
+
+# Code navigation files
+compile_commands.json

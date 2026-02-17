@@ -1,12 +1,12 @@
 /* kinetis_hw.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -64,10 +64,10 @@
 
 // UART TX Port, Pin, Mux and Baud
 #ifdef FREESCALE_KSDK_BM
-    #define UART_PORT       LPUART0                     /* UART Port */
-    #define UART_TX_PORT    PORTA                       /* UART TX Port */
-    #define UART_TX_PIN     2U                          /* UART TX Pin */
-    #define UART_TX_MUX     kPORT_MuxAlt2               /* Kinetis UART pin mux */
+    #define UART_PORT       LPUART4                     /* UART Port */
+    #define UART_TX_PORT    PORTC                       /* UART TX Port */
+    #define UART_TX_PIN     15U                         /* UART TX Pin */
+    #define UART_TX_MUX     kPORT_MuxAlt3               /* Kinetis UART pin mux */
 #elif defined (WOLFSSL_FRDM_K64)
     #define UART_PORT       UART0                       /* UART Port */
     #define UART_TX_PORT    PORTB                       /* UART TX Port */
@@ -91,7 +91,7 @@
 /* Note: TWR-K60 is UART3, PTC17 */
 /* Note: FRDM-K64 is UART4, PTE24 or UART0 PTB17 for OpenOCD  (SIM_SCGC4_UART0_MASK)*/
 /* Note: TWR-K64 is UART5, PTE8 */
-/* Note: FRDM-K82F is LPUART0 A2, LPUART4 PTC15 */
+/* Note: FRDM-K82F is LPUART4 PTC15 Alt3 (OpenOCD UART) */
 
 /***********************************************/
 
@@ -154,14 +154,14 @@ static void hw_gpio_init(void)
 
 static void hw_uart_init(void)
 {
-    register uint16_t sbr, brfa;
-    uint8_t temp;
-
 #ifdef FREESCALE_KSDK_BM
     PORT_SetPinMux(UART_TX_PORT, UART_TX_PIN, UART_TX_MUX);
     CLOCK_SetLpuartClock(1); /* MCGPLLCLK */
     DbgConsole_Init((uint32_t)UART_PORT, UART_BAUD, DEBUG_CONSOLE_DEVICE_TYPE_LPUART, SYS_CLK_HZ);
 #else
+    register uint16_t sbr, brfa;
+    uint8_t temp;
+
     #ifdef WOLFSSL_FRDM_K64
         /* Enable UART core clock ONLY for FRDM-K64F */
         SIM->SCGC4 |= SIM_SCGC4_UART0_MASK;
@@ -217,8 +217,6 @@ static void hw_rtc_init(void)
 
     /* Enable OSC */
     if ((RTC->CR & RTC_CR_OSCE_MASK) == 0) {
-        int i;
-
         /* Turn on */
         RTC->CR |= RTC_CR_OSCE_MASK;
 

@@ -1,12 +1,12 @@
 /* main.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -74,7 +74,7 @@ __task void tcp_tick (void)
 
 __task void tcp_poll (void)
 {
-    WOLFSSL_MSG("TCP polling started.\n") ;
+    WOLFSSL_MSG("TCP polling started.") ;
     while (1) {
         main_TcpNet ();
         #if defined (HAVE_KEIL_RTX)
@@ -99,7 +99,7 @@ extern void benchmark_test(void) ;
 extern void SER_Init(void) ;
 
 /*-----------------------------------------------------------------------------
- *       mian entry
+ *       main entry
  *----------------------------------------------------------------------------*/
 
 /*** This is the parent task entry ***/
@@ -128,7 +128,7 @@ void main_task (void)
     #endif
 
     #ifdef   HAVE_KEIL_RTX
-    WOLFSSL_MSG("Terminating tcp_main\n") ;
+    WOLFSSL_MSG("Terminating tcp_main") ;
     os_tsk_delete_self ();
     #endif
 

@@ -7,8 +7,6 @@
 
 #ifdef HAVE_FIPS
     #define NO_MD4
-    #define NO_HC128
-    #define NO_RABBIT
     #define NO_DSA
     #define NO_PWDBASED
 #else
@@ -19,8 +17,8 @@
     /* 128-bit type */
     #define HAVE___UINT128_T
 
-    /* fast math */
-    #define USE_FAST_MATH
+    /* SP Math */
+    #define WOLFSSL_SP_MATH
     #define HAVE_ECC
 
     /* ECC speedups */
@@ -46,6 +44,7 @@
     /* ARMv8 - iPhone 8/8Plus and iPhone X */
     #ifdef __ARM_FEATURE_CRYPTO
         #define WOLFSSL_ARMASM
+        #define WOLFSSL_SP_ARM64_ASM
     #endif
 
     /* newer algorithms */
@@ -55,7 +54,9 @@
     #define HAVE_CHACHA
 
     #define HAVE_CURVE25519
-    #define HAVE_ED25519
+    #ifndef WOLFSSL_ARMASM
+        #define HAVE_ED25519
+    #endif
 
     /* TLS extensions */
     #define HAVE_ONE_TIME_AUTH
@@ -66,8 +67,6 @@
     /* off by default */
     #define NO_RC4
     #define NO_MD4
-    #define NO_HC128
-    #define NO_RABBIT
     #define NO_DSA
     #define NO_PSK
     #define NO_PWDBASED
@@ -75,6 +74,7 @@
     /* test certificate buffers */
     #define USE_CERT_BUFFERS_2048
     #define USE_CERT_BUFFERS_256
+    #define NO_WRITE_TEMP_FILES
 
     #define WOLFSSL_DTLS
 

@@ -1,12 +1,12 @@
 /* wolfssl_KEIL_RL.c
  *
- * Copyright (C) 2006-2019 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -69,7 +69,7 @@ char *inet_ntoa(struct in_addr in)
 unsigned long inet_addr(const char *cp)
 {
     unsigned int a[4] ; unsigned long ret ;
-    sscanf(cp, "%d.%d.%d.%d", &a[0], &a[1], &a[2], &a[3]) ;
+    sscanf(cp, "%u.%u.%u.%u", &a[0], &a[1], &a[2], &a[3]) ;
     ret = ((a[3]<<24) + (a[2]<<16) + (a[1]<<8) + a[0]) ;
     return(ret) ;
 }
@@ -197,6 +197,7 @@ FILE * wolfSSL_fopen(const char *name, const char *openmode)
     #define PATHSIZE 100
     char path[PATHSIZE] ; char *p ;
 
+    if (name == NULL) return NULL;
     if(strlen(name) > PATHSIZE)return(NULL) ;
 
     for(i = 0; i<= strlen(name); i++) {

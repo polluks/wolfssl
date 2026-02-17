@@ -20,6 +20,7 @@ CSRCS := ../../wolfcrypt/src/rsa.c \
         ../../wolfcrypt/src/memory.c \
         ../../wolfcrypt/src/coding.c \
         ../../wolfcrypt/src/hash.c \
+        ../../wolfcrypt/src/kdf.c \
         ../../wolfcrypt/src/hmac.c \
         ../../wolfcrypt/src/md5.c \
         ../../wolfcrypt/src/wc_port.c \
@@ -83,7 +84,7 @@ clean: rmo
 	rm -f $(OUTPUT)/$(NAME).a
 
 help:
-	@echo "all     : exectue compile, link, rmo"
+	@echo "all     : execute compile, link, rmo"
 	@echo "compile : create .o files"
 	@echo "link    : create .a library from .o files"
 	@echo "rmo     : remove all .o files"
